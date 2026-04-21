@@ -12,7 +12,7 @@ import SessionManager from './SessionManager';
 import Login from './components/Login';
 
 // --- VERCEL/PRODUCTION FIX ---
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:3001";
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || (window.location.hostname === 'localhost' ? "http://localhost:3001" : "https://nm-connect-backend.onrender.com");
 
 export default function App() {
   const [session, setSession] = useState(null);
