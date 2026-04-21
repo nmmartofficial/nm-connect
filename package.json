@@ -1,5 +1,16 @@
 {
-  "dependencies": {
-    "socket.io": "^4.8.3"
+  "name": "nm-connect-master",
+  "version": "1.0.0",
+  "description": "WhatsApp Marketing Tool - Master Project",
+  "private": true,
+  "scripts": {
+    "install:all": "npm install && cd backend && npm install && cd ../nm-dashboard && npm install",
+    "backend": "cd backend && npm start",
+    "frontend": "cd nm-dashboard && npm run dev",
+    "dev": "concurrently \"npm run backend\" \"npm run frontend\"",
+    "build:frontend": "cd nm-dashboard && npm run build"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
   }
 }
