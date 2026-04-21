@@ -25,9 +25,11 @@ export default function SessionManager({ userId, socket, onStatusChange }) {
     // QR Code milne par
     socket.on(`qr_${userId}`, (qr) => {
       console.log("✅ QR Code Received from Backend");
+      if (retryTimer.current) clearTimeout(retryTimer.current);
       setQrCode(qr);
       setWsStatus('Scan QR Now');
       setLoading(false);
+      if (onStatusChange) onStatusChange(false);
     });
 
     // WhatsApp Ready hone par
@@ -83,12 +85,16 @@ export default function SessionManager({ userId, socket, onStatusChange }) {
       {qrCode ? (
         <div className="flex flex-col items-center animate-in fade-in zoom-in duration-500">
           <div className="bg-white p-3 rounded-2xl inline-block shadow-2xl border-4 border-slate-950">
-            <QRCodeSVG 
-              value={qrCode} 
-              size={150} 
-              level="H" // Higher error correction for better scanning
-              includeMargin={false} 
-            />
+            {qrCode.startsWith('data:image') ? (
+              <img src={qrCode} alt="WhatsApp QR" className="w-[150px] h-[150px]" />
+            ) : (
+              <QRCodeSVG 
+                value={qrCode} 
+                size={150} 
+                level="H"
+                includeMargin={false} 
+              />
+            )}
           </div>
           <div className="mt-4 bg-blue-500/10 px-4 py-2 rounded-xl border border-blue-500/20">
              <p className="text-[10px] font-black text-blue-400 uppercase tracking-tighter">
