@@ -22,6 +22,15 @@ export default function SessionManager({ userId, socket, onStatusChange }) {
       }
     });
 
+    socket.on('whatsapp_authenticated', (data) => {
+      console.log("🔓 SessionManager: Authenticated, waiting for ready...");
+      if (data.userId === userId) {
+        setQrCode(null);
+        setLoading(true);
+        setStatus('Connecting to WhatsApp...');
+      }
+    });
+
     socket.on('whatsapp_ready', (data) => {
       console.log("🚀 SessionManager: WhatsApp Ready");
       if (data.userId === userId) {

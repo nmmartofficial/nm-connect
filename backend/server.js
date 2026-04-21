@@ -50,20 +50,22 @@ const initializeWhatsApp = (userId) => {
     });
 
     whatsappClient.on('qr', async (qr) => {
-        console.log("✅ QR Code Generated");
+        console.log("✅ QR Code Generated. Please scan now.");
         lastQR = await qrcode.toDataURL(qr);
         io.emit('qr_update', { qr: lastQR, userId });
     });
 
+    whatsappClient.on('authenticated', () => {
+        console.log("� Authenticated successfully! Loading chats...");
+        lastQR = null;
+        io.emit('whatsapp_authenticated', { userId });
+    });
+
     whatsappClient.on('ready', () => {
-        console.log("🚀 WhatsApp Client is Ready!");
+        console.log("� WhatsApp Client is Ready and Connected!");
         isInitializing = false;
         lastQR = null;
         io.emit('whatsapp_ready', { userId });
-    });
-
-    whatsappClient.on('authenticated', () => {
-        console.log("🔓 Authenticated successfully");
     });
 
     whatsappClient.on('auth_failure', (msg) => {
