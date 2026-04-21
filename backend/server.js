@@ -153,16 +153,23 @@ io.on('connection', (socket) => {
 const handleSessionRequest = (userId, socket) => {
     console.log(`📩 Session requested by: ${userId}`);
     if (!whatsappClient) {
+        socket.emit('whatsapp_status', { msg: 'Initializing WhatsApp...' });
         initializeWhatsApp(userId);
     } else {
         if (lastQR) {
             socket.emit('qr_update', { qr: lastQR, userId });
         }
+        
         whatsappClient.getState().then(state => {
+            console.log(`📡 Current WhatsApp State: ${state}`);
             if (state === 'CONNECTED') {
                 socket.emit('whatsapp_ready', { userId });
+            } else {
+                socket.emit('whatsapp_status', { msg: `Status: ${state || 'Initializing...'}` });
             }
-        }).catch(() => {});
+        }).catch(() => {
+            socket.emit('whatsapp_status', { msg: 'Connecting...' });
+        });
     }
 };
 
