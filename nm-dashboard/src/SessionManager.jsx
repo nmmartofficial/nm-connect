@@ -13,6 +13,11 @@ export default function SessionManager({ userId, socket, onStatusChange }) {
     // Request session on mount
     socket.emit('request_session', userId);
 
+    socket.on('whatsapp_status', (data) => {
+      console.log("📡 Status Update:", data.msg);
+      setStatus(data.msg);
+    });
+
     socket.on('qr_update', (data) => {
       console.log("✅ SessionManager: QR Received");
       if (data.userId === userId) {
@@ -56,6 +61,7 @@ export default function SessionManager({ userId, socket, onStatusChange }) {
     });
 
     return () => {
+      socket.off('whatsapp_status');
       socket.off('qr_update');
       socket.off('whatsapp_ready');
       socket.off('whatsapp_disconnected');
