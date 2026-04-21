@@ -65,6 +65,10 @@ const initializeWhatsApp = async (userId) => {
                 clientId: userId,
                 dataPath: './.wwebjs_auth' 
             }),
+            webVersionCache: {
+                type: 'remote',
+                remotePath: 'https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/2.2412.54.html',
+            },
             puppeteer: {
                 headless: true,
                 args: [
@@ -76,23 +80,45 @@ const initializeWhatsApp = async (userId) => {
                     '--no-zygote',
                     '--disable-gpu',
                     '--single-process',
+                    '--disable-extensions',
+                    '--disable-background-networking',
+                    '--disable-default-apps',
+                    '--disable-sync',
+                    '--disable-translate',
+                    '--hide-scrollbars',
+                    '--metrics-recording-only',
+                    '--mute-audio',
+                    '--safebrowsing-disable-auto-update',
+                    '--ignore-certificate-errors',
+                    '--ignore-ssl-errors',
+                    '--ignore-certificate-errors-spki-list',
                     '--js-flags="--max-old-space-size=256"'
                 ],
                 executablePath: chromePath || null,
             }
         });
 
-        io.emit('whatsapp_status', { msg: 'Connecting to WhatsApp...' });
-        console.log("⏳ Calling whatsappClient.initialize()...");
+        io.emit('whatsapp_status', { msg: 'Launching WhatsApp Engine...' });
+        console.log("⏳ Initializing WhatsApp Client...");
+
+        // Set a safety timeout
+        const initTimeout = setTimeout(() => {
+            if (isInitializing && !lastQR) {
+                console.log("⚠️ Init taking too long, check Render logs for OOM");
+                io.emit('whatsapp_status', { msg: 'Still connecting... Render is slow' });
+            }
+        }, 30000);
 
         whatsappClient.on('qr', async (qr) => {
-            console.log("✅ QR Code Generated. Please scan now.");
-            io.emit('whatsapp_status', { msg: 'QR Code Generated! Please scan.' });
+            clearTimeout(initTimeout);
+            console.log("✅ QR Code Generated.");
+            io.emit('whatsapp_status', { msg: 'QR Code Ready! Scan now.' });
             lastQR = await qrcode.toDataURL(qr);
             io.emit('qr_update', { qr: lastQR, userId });
         });
 
         whatsappClient.on('authenticated', () => {
+            clearTimeout(initTimeout);
             console.log("� Authenticated successfully! Loading chats...");
             io.emit('whatsapp_status', { msg: 'Authenticated! Loading chats...' });
             lastQR = null;
@@ -100,6 +126,7 @@ const initializeWhatsApp = async (userId) => {
         });
 
         whatsappClient.on('ready', () => {
+            clearTimeout(initTimeout);
             console.log("� WhatsApp Client is Ready and Connected!");
             io.emit('whatsapp_status', { msg: 'WhatsApp is Ready!' });
             isInitializing = false;
