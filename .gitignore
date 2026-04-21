@@ -1,0 +1,8 @@
+node_modules/
+.env
+.DS_Store
+dist/
+backend/.wwebjs_auth/
+backend/.wwebjs_cache/
+nm-dashboard/dist/
+*.log
