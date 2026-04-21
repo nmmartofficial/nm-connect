@@ -1,0 +1,9 @@
+{
+  "version": 2,
+  "buildCommand": "cd nm-dashboard && npm install && npm run build",
+  "outputDirectory": "nm-dashboard/dist",
+  "framework": "vite",
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
+}
