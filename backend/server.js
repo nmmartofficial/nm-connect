@@ -21,8 +21,8 @@ const io = new Server(server, {
 
 // Supabase Setup
 const supabase = createClient(
-    process.env.SUPABASE_URL || 'https://lxdqygldjjbgpzpklbns.supabase.co',
-    process.env.SUPABASE_KEY || 'sb_publishable_Y1d7P8E-IH-IfVI1tOb3NQ_zZSs5-yc'
+    process.env.SUPABASE_URL,
+    process.env.SUPABASE_KEY
 );
 
 const sessions = {};
