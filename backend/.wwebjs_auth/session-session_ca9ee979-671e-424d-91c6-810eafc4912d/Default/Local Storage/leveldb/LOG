@@ -1,0 +1,5 @@
+2026/04/20-19:38:44.084 28d8 Creating DB D:\NM MART DATA\nm-connect\backend\.wwebjs_auth\session-session_ca9ee979-671e-424d-91c6-810eafc4912d\Default\Local Storage\leveldb since it was missing.
+2026/04/20-19:38:44.100 28d8 Reusing MANIFEST D:\NM MART DATA\nm-connect\backend\.wwebjs_auth\session-session_ca9ee979-671e-424d-91c6-810eafc4912d\Default\Local Storage\leveldb/MANIFEST-000001
+2026/04/20-21:51:21.183 28d8 Level-0 table #5: started
+2026/04/20-21:51:21.208 28d8 Level-0 table #5: 18952 bytes OK
+2026/04/20-21:51:21.218 28d8 Delete type=0 #3
