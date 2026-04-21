@@ -29,12 +29,15 @@ let whatsappClient = null;
 let isInitializing = false;
 let lastQR = null;
 
-const initializeWhatsApp = (userId) => {
+const initializeWhatsApp = async (userId) => {
     if (isInitializing) return;
     if (whatsappClient) return;
 
     isInitializing = true;
     console.log(`🛠️ Initializing WhatsApp for user: ${userId}`);
+
+    // Thoda delay taaki purana process release ho jaye
+    await new Promise(r => setTimeout(r, 2000));
 
     whatsappClient = new Client({
         authStrategy: new LocalAuth({ clientId: userId }),
@@ -50,12 +53,9 @@ const initializeWhatsApp = (userId) => {
                 '--no-zygote',
                 '--single-process',
                 '--disable-extensions',
-                '--disable-component-update',
-                '--disable-features=Translate',
-                '--disable-sync',
-                '--no-default-browser-check',
                 '--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
             ],
+            timeout: 60000, // Timeout badha diya taaki crash na ho
         }
     });
 
