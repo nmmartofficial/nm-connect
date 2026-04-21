@@ -2,7 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
-const { Client, LocalAuth } = require('whatsapp-web.js');
+const { Client, LocalAuth, MessageMedia } = require('whatsapp-web.js');
 const qrcode = require('qrcode');
 const cors = require('cors');
 const { createClient } = require('@supabase/supabase-js');
@@ -75,6 +75,30 @@ const createSession = (userId) => {
         client.initialize().catch(err => console.error("Re-init Error:", err));
     });
 
+    client.on('message', async (msg) => {
+        const text = msg.body.toLowerCase();
+        
+        // Simple Auto-Responder logic
+        const responses = {
+            'hi': 'Hello! Welcome to NM CONNECT. How can we help you today?',
+            'hello': 'Hi there! NM CONNECT v5.0 is at your service.',
+            'price': 'Our plans start from ₹499/mo. Check our dashboard for details!',
+            'help': 'You can use NM CONNECT for bulk WhatsApp marketing, auto-replies, and analytics.',
+        };
+
+        for (const [keyword, response] of Object.entries(responses)) {
+            if (text.includes(keyword)) {
+                await msg.reply(response);
+                io.emit(`log_${userId}`, { 
+                    type: 'info', 
+                    msg: `Auto-replied to ${msg.from} for keyword: ${keyword}`,
+                    time: new Date().toLocaleTimeString() 
+                });
+                break;
+            }
+        }
+    });
+
     client.initialize().catch(err => console.error("Init Error:", err));
     sessions[userId] = client;
 };
@@ -104,20 +128,35 @@ io.on('connection', (socket) => {
 
 // --- API ENDPOINT ---
 app.post('/api/send-bulk', async (req, res) => {
-    const { contacts, messages, userId } = req.body;
+    const { contacts, messages, userId, media } = req.body;
     const client = sessions[userId];
 
     if (!client) return res.status(400).json({ error: "Session not active" });
 
     res.json({ status: "Campaign Started" });
 
+    let messageMedia = null;
+    if (media && media.data && media.mimetype && media.filename) {
+        messageMedia = new MessageMedia(media.mimetype, media.data, media.filename);
+    }
+
     for (const contact of contacts) {
         try {
-            const msg = messages[Math.floor(Math.random() * messages.length)];
+            let msg = messages[Math.floor(Math.random() * messages.length)];
+            
+            // Variable Parsing (e.g., {name})
+            if (contact.name) {
+                msg = msg.replace(/{name}/g, contact.name);
+            }
+
             const cleanNumber = contact.number.replace(/\D/g, '');
             const chatId = `${cleanNumber}@c.us`;
             
-            await client.sendMessage(chatId, msg);
+            if (messageMedia) {
+                await client.sendMessage(chatId, messageMedia, { caption: msg });
+            } else {
+                await client.sendMessage(chatId, msg);
+            }
             
             // Update Supabase status
             await supabase

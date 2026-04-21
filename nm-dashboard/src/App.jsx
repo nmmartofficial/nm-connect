@@ -24,6 +24,7 @@ export default function App() {
   const [isWhatsAppReady, setIsWhatsAppReady] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [messageVariations, setMessageVariations] = useState({ A: '' });
+  const [selectedMedia, setSelectedMedia] = useState(null);
   const [stats, setStats] = useState({ total: 0, sent: 0, pending: 0 });
 
   const socket = useMemo(() => io(BACKEND_URL, {
@@ -92,13 +93,24 @@ export default function App() {
 
     try {
       setLoading(true);
+      
+      let mediaData = null;
+      if (selectedMedia) {
+        mediaData = {
+          data: selectedMedia.data,
+          mimetype: selectedMedia.mimetype,
+          filename: selectedMedia.filename
+        };
+      }
+
       const response = await fetch(`${BACKEND_URL}/api/send-bulk`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           contacts: targetList, 
           messages: [messageVariations.A], 
-          userId: USER_ID 
+          userId: USER_ID,
+          media: mediaData
         })
       });
       if (response.ok) {
@@ -132,6 +144,21 @@ export default function App() {
       else alert("Error uploading data!");
     };
     reader.readAsBinaryString(file);
+  };
+
+  const handleMediaUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      const base64Data = evt.target.result.split(',')[1];
+      setSelectedMedia({
+        data: base64Data,
+        mimetype: file.type,
+        filename: file.name
+      });
+    };
+    reader.readAsDataURL(file);
   };
 
   const deleteData = async () => {
@@ -228,6 +255,10 @@ export default function App() {
                                 <div className="p-4 border-b border-slate-800 bg-slate-800/30 flex justify-between items-center">
                                     <h3 className="font-bold flex items-center gap-2"><MessageSquare size={18} className="text-blue-500"/> Campaign Settings</h3>
                                     <div className="flex gap-2">
+                                        <label className="cursor-pointer bg-slate-800 hover:bg-slate-700 text-slate-300 px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-2 transition-all border border-slate-700">
+                                            <ImageIcon size={14}/> {selectedMedia ? selectedMedia.filename : 'Add Media'}
+                                            <input type="file" className="hidden" onChange={handleMediaUpload} accept="image/*,application/pdf" />
+                                        </label>
                                         <label className="cursor-pointer bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-2 transition-all">
                                             <Upload size={14}/> Import Excel
                                             <input type="file" className="hidden" onChange={handleFileUpload} accept=".xlsx,.xls" />
@@ -329,10 +360,62 @@ export default function App() {
                 </>
             ) : (
                 /* HISTORY TAB */
-                <div className="bg-slate-900 rounded-2xl border border-slate-800 p-8 text-center space-y-4">
-                    <HistoryIcon size={48} className="mx-auto text-slate-700"/>
-                    <h2 className="text-xl font-bold">Campaign History</h2>
-                    <p className="text-slate-500 max-w-md mx-auto">This section will show your past campaign performance and analytics. Coming soon in next update!</p>
+                <div className="space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="bg-slate-900 rounded-2xl border border-slate-800 p-6 flex flex-col items-center justify-center space-y-4">
+                            <HistoryIcon size={48} className="text-blue-500"/>
+                            <h2 className="text-xl font-bold">Campaign Performance</h2>
+                            <div className="w-full space-y-2">
+                                <div className="flex justify-between text-sm">
+                                    <span className="text-slate-500">Success Rate</span>
+                                    <span className="text-green-500 font-bold">
+                                        {stats.total > 0 ? Math.round((stats.sent / stats.total) * 100) : 0}%
+                                    </span>
+                                </div>
+                                <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
+                                    <div 
+                                        className="bg-green-500 h-full transition-all duration-1000" 
+                                        style={{ width: `${stats.total > 0 ? (stats.sent / stats.total) * 100 : 0}%` }}
+                                    ></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="bg-slate-900 rounded-2xl border border-slate-800 p-6">
+                             <h3 className="font-bold mb-4 flex items-center gap-2"><ListChecks size={18} className="text-blue-500"/> Campaign Summary</h3>
+                             <div className="space-y-3">
+                                <div className="flex justify-between p-3 bg-slate-950 rounded-xl border border-slate-800">
+                                    <span className="text-slate-400">Total Contacts</span>
+                                    <span className="font-bold">{stats.total}</span>
+                                </div>
+                                <div className="flex justify-between p-3 bg-slate-950 rounded-xl border border-slate-800">
+                                    <span className="text-slate-400">Successfully Sent</span>
+                                    <span className="font-bold text-green-500">{stats.sent}</span>
+                                </div>
+                                <div className="flex justify-between p-3 bg-slate-950 rounded-xl border border-slate-800">
+                                    <span className="text-slate-400">Pending / Failed</span>
+                                    <span className="font-bold text-orange-500">{stats.pending}</span>
+                                </div>
+                             </div>
+                        </div>
+                    </div>
+
+                    <div className="bg-slate-900 rounded-2xl border border-slate-800 overflow-hidden">
+                        <div className="p-4 border-b border-slate-800 bg-slate-800/30 flex justify-between items-center">
+                            <h3 className="font-bold">Detailed Activity Log</h3>
+                            <button onClick={() => setLogs([])} className="text-xs text-slate-500 hover:text-slate-300">Clear Logs</button>
+                        </div>
+                        <div className="p-4 max-h-[400px] overflow-y-auto space-y-2">
+                            {logs.map((log, i) => (
+                                <div key={i} className="flex items-center gap-3 p-3 bg-slate-950 rounded-lg border border-slate-800 text-[11px] font-mono">
+                                    <span className="text-slate-600">[{log.time}]</span>
+                                    <span className={log.type === 'success' ? 'text-green-500' : log.type === 'error' ? 'text-red-500' : 'text-blue-500'}>
+                                        {log.msg}
+                                    </span>
+                                </div>
+                            ))}
+                            {logs.length === 0 && <p className="text-center text-slate-500 py-8">No recent activity logs.</p>}
+                        </div>
+                    </div>
                 </div>
             )}
         </main>
