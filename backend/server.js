@@ -70,7 +70,7 @@ const initializeWhatsApp = async (userId) => {
                 remotePath: 'https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/2.2412.54.html',
             },
             puppeteer: {
-                headless: true,
+                headless: "new",
                 args: [
                     '--no-sandbox',
                     '--disable-setuid-sandbox',
@@ -92,6 +92,8 @@ const initializeWhatsApp = async (userId) => {
                     '--ignore-certificate-errors',
                     '--ignore-ssl-errors',
                     '--ignore-certificate-errors-spki-list',
+                    '--proxy-server="direct://"',
+                    '--proxy-bypass-list=*',
                     '--js-flags="--max-old-space-size=256"'
                 ],
                 executablePath: chromePath || null,
