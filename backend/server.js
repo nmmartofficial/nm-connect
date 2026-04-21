@@ -29,6 +29,7 @@ const supabase = createClient(
 let whatsappClient = null;
 let isInitializing = false;
 let lastQR = null;
+const runningCampaigns = new Map(); // Tracks active campaigns by userId
 
 const initializeWhatsApp = async (userId) => {
     if (isInitializing) return;
@@ -79,6 +80,47 @@ const initializeWhatsApp = async (userId) => {
         io.emit('whatsapp_ready', { userId });
     });
 
+    // --- AUTO-RESPONDER BOT (Keyword-based) ---
+    whatsappClient.on('message', async (msg) => {
+        if (msg.fromMe) return; // Don't respond to own messages
+        
+        const incomingMsg = msg.body.toLowerCase();
+        console.log(`📩 Received message from ${msg.from}: ${incomingMsg}`);
+
+        // 1. Fetch user data to check plan
+        const { data: userData } = await supabase.from('users').select('plan_name').eq('id', userId).single();
+        const plan = userData?.plan_name || 'Free';
+
+        // Bot only works for Gold/Enterprise users
+        if (plan !== 'Gold' && plan !== 'Enterprise') {
+            return;
+        }
+
+        // 2. Fetch auto-responses from Supabase for this user
+        const { data: responses } = await supabase
+            .from('auto_responses')
+            .select('*')
+            .eq('user_id', userId);
+
+        if (responses && responses.length > 0) {
+            const matchedResponse = responses.find(r => incomingMsg.includes(r.keyword.toLowerCase()));
+            
+            if (matchedResponse) {
+                console.log(`🤖 Auto-responding to ${msg.from} with keyword: ${matchedResponse.keyword}`);
+                
+                // Human-like delay before auto-reply
+                await new Promise(r => setTimeout(r, Math.random() * 3000 + 2000));
+                
+                await msg.reply(matchedResponse.response);
+                
+                io.emit(`log_${userId}`, { 
+                    type: 'info', 
+                    msg: `🤖 Bot: Auto-replied to ${msg.from.split('@')[0]} (Keyword: ${matchedResponse.keyword})` 
+                });
+            }
+        }
+    });
+
     whatsappClient.on('auth_failure', (msg) => {
         console.error("❌ Auth Failure:", msg);
         isInitializing = false;
@@ -124,17 +166,71 @@ const handleSessionRequest = (userId, socket) => {
     }
 };
 
+app.post('/api/stop-campaign', (req, res) => {
+    const { userId } = req.body;
+    if (runningCampaigns.has(userId)) {
+        runningCampaigns.set(userId, false); // Mark it to stop
+        console.log(`🛑 Stopping campaign for user: ${userId}`);
+        return res.json({ status: "Stopping campaign..." });
+    }
+    res.status(400).json({ error: "No active campaign to stop" });
+});
+
 app.post('/api/send-bulk', async (req, res) => {
-    const { contacts, messages, userId, media } = req.body;
-    console.log(`📩 Bulk Send Request received for user: ${userId} with ${contacts.length} contacts`);
+    const { contacts, messages, userId, media, startIndex = 0, campaignName = 'General Campaign', scheduledAt = null } = req.body;
+    
+    // --- PLAN CHECKING LOGIC ---
+    const { data: userData } = await supabase.from('users').select('plan_name, daily_limit').eq('id', userId).single();
+    const plan = userData?.plan_name || 'Free';
+    const limit = userData?.daily_limit || 50;
+
+    if (contacts.length > limit && plan !== 'Gold' && plan !== 'Enterprise') {
+        return res.status(403).json({ error: `Your ${plan} plan limit is ${limit} contacts. Please upgrade to Gold for unlimited messaging.` });
+    }
+
+    // --- MEDIA RESTRICTION LOGIC ---
+    if (media && plan === 'Monthly') {
+        return res.status(403).json({ error: "Photo/Media sending is only available in Yearly plans (Silver/Gold). Please upgrade." });
+    }
+
+    console.log(`📩 Bulk Send Request: user ${userId} (${plan}), ${contacts.length} contacts`);
     
     if (!whatsappClient) {
         console.error("❌ Bulk Send Failed: WhatsApp not connected");
         return res.status(400).json({ error: "WhatsApp not connected" });
     }
 
-    res.json({ status: "Campaign Started" });
+    // --- CREATE CAMPAIGN RECORD (Reporting & Scheduling) ---
+    const campaignStatus = scheduledAt ? 'Scheduled' : 'Running';
+    
+    const { data: campaignRecord } = await supabase
+        .from('campaigns')
+        .insert([{ 
+            user_id: userId, 
+            name: campaignName, 
+            total_contacts: contacts.length, 
+            status: campaignStatus,
+            scheduled_at: scheduledAt,
+            // Store original request data for scheduled runs
+            metadata: { contacts, messages, media, startIndex } 
+        }])
+        .select()
+        .single();
 
+    if (scheduledAt) {
+        console.log(`🕒 Campaign scheduled for ${scheduledAt}`);
+        return res.json({ status: "Campaign Scheduled", campaignId: campaignRecord?.id });
+    }
+
+    // If not scheduled, start immediately
+    runningCampaigns.set(userId, true);
+    res.json({ status: "Campaign Started", startIndex, campaignId: campaignRecord?.id });
+
+    startCampaign(userId, contacts, messages, media, startIndex, campaignRecord?.id);
+});
+
+// Extracted Campaign Logic for Reusability (Scheduling)
+const startCampaign = async (userId, contacts, messages, media, startIndex, campaignId) => {
     let messageMedia = null;
     if (media && media.data) {
         try {
@@ -145,43 +241,180 @@ app.post('/api/send-bulk', async (req, res) => {
         }
     }
 
-    for (const contact of contacts) {
+    let sentCount = 0;
+    let invalidCount = 0;
+    
+    // Randomize batch thresholds initially to prevent any fixed patterns
+    let nextDistractionAt = Math.floor(Math.random() * (15 - 8 + 1)) + 8; 
+    let nextCoffeeAt = Math.floor(Math.random() * (55 - 35 + 1)) + 35;
+
+    // Start from the provided index
+    for (let i = startIndex; i < contacts.length; i++) {
+        // Check if user clicked STOP
+        if (runningCampaigns.get(userId) === false) {
+            console.log(`🛑 Campaign stopped by user ${userId} at index ${i}`);
+            io.emit(`log_${userId}`, { type: 'info', msg: '🛑 Campaign stopped manually!' });
+            break;
+        }
+
+        const contact = contacts[i];
         try {
-            let msg = messages[Math.floor(Math.random() * messages.length)];
-            if (contact.name) msg = msg.replace(/{name}/g, contact.name);
-            
-            const randomString = Math.random().toString(36).substring(7);
-            const finalMsg = `${msg}\n\n_${randomString}_`;
             const cleanNumber = contact.number.toString().replace(/\D/g, '');
             const chatId = `${cleanNumber}@c.us`;
 
-            console.log(`📤 Sending to ${cleanNumber}...`);
-
-            if (messageMedia) {
-                await whatsappClient.sendMessage(chatId, messageMedia, { caption: finalMsg });
-            } else {
-                await whatsappClient.sendMessage(chatId, finalMsg);
-            }
-
-            console.log(`✅ Message sent to ${cleanNumber}`);
-
-            await supabase.from('customers').update({ status: 'Sent' }).eq('id', contact.id);
+            // 1. Check if number is registered on WhatsApp
+            const isRegistered = await whatsappClient.isRegisteredUser(chatId);
             
-            // Emit logs using both old and new event names for safety
-            io.emit('campaign_log', { type: 'success', msg: `Sent to ${contact.number}` });
-            io.emit(`log_${userId}`, { type: 'success', msg: `Sent to ${contact.number}` });
+            if (!isRegistered) {
+                console.log(`🚫 Number ${cleanNumber} is not registered on WhatsApp. Removing...`);
+                await supabase.from('customers').delete().eq('id', contact.id);
+                invalidCount++;
+                
+                io.emit(`log_${userId}`, {
+                      type: 'error', 
+                      msg: `Invalid Number Removed: ${contact.number}`,
+                      progress: { current: i + 1, total: contacts.length, sent: sentCount, invalid: invalidCount, lastIndex: i }
+                  });
+                  continue; // Skip to next contact
+               }
 
-            const delay = Math.floor(Math.random() * (15000 - 8000 + 1)) + 8000;
-            console.log(`⏳ Waiting ${delay/1000}s for next message...`);
-            await new Promise(r => setTimeout(r, delay));
-        } catch (err) {
-            console.error(`❌ Failed to send to ${contact.number}:`, err.message);
-            io.emit('campaign_log', { type: 'error', msg: `Failed: ${contact.number}` });
-            io.emit(`log_${userId}`, { type: 'error', msg: `Failed: ${contact.number}` });
+                // --- THE CHAOS ENGINE: 100% UNPREDICTABLE BUSINESS MESSAGING ---
+                
+                // A. Professional Closings Variation (Prevents text pattern detection)
+                const offerCode = `NM${Math.floor(1000 + Math.random() * 9000)}`;
+                const closings = [
+                    `\n\n*Ref: ${offerCode}*`,
+                    `\n\n(Offer Code: ${offerCode})`,
+                    `\n\n[Reference: ${offerCode}]`,
+                    `\n\n_Ref No: ${offerCode}_`,
+                    `\n\n*Regards, NM Mart*`,
+                    `\n\n_Thank you for choosing NM Mart!_`
+                ];
+                const closing = closings[Math.floor(Math.random() * closings.length)];
+
+                // B. Spintax + Name Personalization
+                const spinMessage = (text) => {
+                    return text.replace(/{([^{}]+)}/g, (match, options) => {
+                        const choices = options.split('|');
+                        return choices[Math.floor(Math.random() * choices.length)];
+                    });
+                };
+
+                let msg = messages[Math.floor(Math.random() * messages.length)];
+                if (contact.name) msg = msg.replace(/{name}/g, contact.name);
+                msg = spinMessage(msg); 
+
+                const finalMsg = `${msg}${closing}`;
+
+                const chat = await whatsappClient.getChatById(chatId);
+                
+                // C. Simulate Human "Pre-Message" Behavior
+                await whatsappClient.sendPresenceAvailable();
+                io.emit(`log_${userId}`, { type: 'info', msg: `📖 Checking chat with ${contact.number}...` });
+                await chat.sendSeen(); 
+                await new Promise(r => setTimeout(r, Math.random() * 2000 + 500)); // Read for 0.5-2.5s
+                
+                // D. Variable Typing & "Thinking" Pauses
+                await chat.sendStateTyping();
+                const typingTime = Math.min(finalMsg.length * (Math.random() * 25 + 15), 5000); 
+                io.emit(`log_${userId}`, { type: 'info', msg: `✍️ Typing personalized offer...` });
+                await new Promise(r => setTimeout(r, typingTime));
+
+                // Tiny pause after typing (thinking before clicking send)
+                await new Promise(r => setTimeout(r, Math.random() * 1500 + 500));
+
+                if (messageMedia) {
+                    await whatsappClient.sendMessage(chatId, messageMedia, { caption: finalMsg });
+                } else {
+                    await whatsappClient.sendMessage(chatId, finalMsg);
+                }
+
+                sentCount++;
+                console.log(`✅ Message sent to ${cleanNumber}`);
+
+                await supabase.from('customers').update({ status: 'Sent' }).eq('id', contact.id);
+                
+                // Update Campaign Record intermittently
+                if (campaignId) {
+                    await supabase.from('campaigns').update({ sent_count: sentCount, invalid_count: invalidCount }).eq('id', campaignId);
+                }
+
+                // Emit progress update
+                io.emit(`log_${userId}`, { 
+                    type: 'success', 
+                    msg: `Sent to ${contact.number}`,
+                    progress: { current: i + 1, total: contacts.length, sent: sentCount, invalid: invalidCount, lastIndex: i }
+                });
+
+                // E. PROBABILITY-BASED CHAOS (No fixed cycles or patterns)
+                let delay;
+                const chaosChance = Math.random(); // 0 to 1
+
+                if (chaosChance < 0.05 && sentCount > 10) { 
+                    // 5% CHANCE: "Deep Distraction" (12-25 mins) + GO OFFLINE
+                    const deepMinutes = Math.floor(Math.random() * (25 - 12 + 1)) + 12;
+                    delay = deepMinutes * 60 * 1000;
+                    console.log(`🛌 Deep Distraction: Going offline for ${deepMinutes} mins...`);
+                    io.emit(`log_${userId}`, { type: 'info', msg: `🛌 Offline break for ${deepMinutes} mins...` });
+                    await whatsappClient.sendPresenceUnavailable(); // Simulate locking phone
+                } else if (chaosChance < 0.15 && sentCount > 5) {
+                    // 10% CHANCE: "Quick Phone Check" (2-5 mins)
+                    const quickMinutes = Math.floor(Math.random() * (5 - 2 + 1)) + 2;
+                    delay = quickMinutes * 60 * 1000;
+                    console.log(`📱 Quick Check: Waiting ${quickMinutes} mins...`);
+                    io.emit(`log_${userId}`, { type: 'info', msg: `📱 Random phone check for ${quickMinutes} mins...` });
+                } else {
+                    // REGULAR HUMAN DELAY (20-55 seconds)
+                    delay = Math.floor(Math.random() * (55000 - 20000 + 1)) + 20000;
+                    console.log(`⏳ Waiting ${delay/1000}s for next message...`);
+                }
+
+                await new Promise(r => setTimeout(r, delay));
+   
+           } catch (err) {
+               console.error(`❌ Failed to send to ${contact.number}:`, err.message);
+               io.emit(`log_${userId}`, { 
+                   type: 'error', 
+                   msg: `Failed: ${contact.number}`,
+                   progress: { current: i + 1, total: contacts.length, sent: sentCount, invalid: invalidCount, lastIndex: i }
+               });
+           }
+       }
+       console.log("🏁 Campaign finished");
+       runningCampaigns.delete(userId);
+ 
+       // Final Campaign Update
+       if (campaignId) {
+           await supabase.from('campaigns').update({ status: 'Completed', sent_count: sentCount, invalid_count: invalidCount }).eq('id', campaignId);
+       }
+ 
+       io.emit(`log_${userId}`, { type: 'info', msg: '🏁 Campaign finished!' });
+};
+
+// --- CAMPAIGN SCHEDULER RUNNER (Every Minute) ---
+setInterval(async () => {
+    const now = new Date().toISOString();
+    
+    const { data: scheduledCampaigns } = await supabase
+        .from('campaigns')
+        .select('*')
+        .eq('status', 'Scheduled')
+        .lte('scheduled_at', now);
+
+    if (scheduledCampaigns && scheduledCampaigns.length > 0) {
+        for (const camp of scheduledCampaigns) {
+            console.log(`🚀 Starting scheduled campaign: ${camp.name}`);
+            
+            // Mark as running first
+            await supabase.from('campaigns').update({ status: 'Running' }).eq('id', camp.id);
+            
+            runningCampaigns.set(camp.user_id, true);
+            
+            const { contacts, messages, media, startIndex } = camp.metadata;
+            startCampaign(camp.user_id, contacts, messages, media, startIndex, camp.id);
         }
     }
-    console.log("🏁 Campaign finished");
-});
+}, 60000); // Check every 60 seconds
 
 const PORT = process.env.PORT || 3001;
 server.listen(PORT, () => console.log(`🚀 Master Server on port ${PORT}`));
