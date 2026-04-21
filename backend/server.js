@@ -103,22 +103,25 @@ const initializeWhatsApp = (userId) => {
 io.on('connection', (socket) => {
     console.log('🔌 Socket Connected:', socket.id);
 
-    socket.on('request_session', (userId) => {
-        console.log(`📩 Session requested by: ${userId}`);
-        if (!whatsappClient) {
-            initializeWhatsApp(userId);
-        } else {
-            if (lastQR) {
-                socket.emit('qr_update', { qr: lastQR, userId });
-            }
-            whatsappClient.getState().then(state => {
-                if (state === 'CONNECTED') {
-                    socket.emit('whatsapp_ready', { userId });
-                }
-            }).catch(() => {});
-        }
-    });
+    socket.on('request_session', (userId) => handleSessionRequest(userId, socket));
+    socket.on('init-session', (userId) => handleSessionRequest(userId, socket));
 });
+
+const handleSessionRequest = (userId, socket) => {
+    console.log(`📩 Session requested by: ${userId}`);
+    if (!whatsappClient) {
+        initializeWhatsApp(userId);
+    } else {
+        if (lastQR) {
+            socket.emit('qr_update', { qr: lastQR, userId });
+        }
+        whatsappClient.getState().then(state => {
+            if (state === 'CONNECTED') {
+                socket.emit('whatsapp_ready', { userId });
+            }
+        }).catch(() => {});
+    }
+};
 
 app.post('/api/send-bulk', async (req, res) => {
     const { contacts, messages, userId, media } = req.body;

@@ -72,7 +72,7 @@ export default function App() {
     
     socket.on('connect', () => {
       console.log("🟢 Socket Connected, requesting session...");
-      socket.emit('init-session', USER_ID);
+      socket.emit('request_session', USER_ID);
     });
 
     socket.on(`ready_${USER_ID}`, () => setIsWhatsAppReady(true));
