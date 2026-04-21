@@ -50,7 +50,7 @@ const initializeWhatsApp = async (userId) => {
             }),
             webVersionCache: {
                 type: 'remote',
-                remotePath: 'https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/2.2412.54.html',
+                remotePath: 'https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/2.3000.1014133536-alpha.html',
             },
             puppeteer: {
                 headless: true,
@@ -62,13 +62,15 @@ const initializeWhatsApp = async (userId) => {
                     '--no-first-run',
                     '--no-zygote',
                     '--disable-gpu',
-                    '--single-process'
+                    '--single-process',
+                    '--js-flags="--max-old-space-size=256"'
                 ],
                 executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || null,
             }
         });
 
         io.emit('whatsapp_status', { msg: 'Connecting to WhatsApp...' });
+        console.log("⏳ Calling whatsappClient.initialize()...");
 
         whatsappClient.on('qr', async (qr) => {
             console.log("✅ QR Code Generated. Please scan now.");
