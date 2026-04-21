@@ -92,76 +92,73 @@ const initializeWhatsApp = async (userId) => {
             io.emit('whatsapp_ready', { userId });
         });
 
-        // ... existing listeners ...
+        // --- AUTO-RESPONDER BOT (Keyword-based) ---
+        whatsappClient.on('message', async (msg) => {
+            if (msg.fromMe) return; // Don't respond to own messages
+            
+            const incomingMsg = msg.body.toLowerCase();
+            console.log(`📩 Received message from ${msg.from}: ${incomingMsg}`);
+
+            // 1. Fetch user data to check plan
+            const { data: userData } = await supabase.from('users').select('plan_name').eq('id', userId).single();
+            const plan = userData?.plan_name || 'Free';
+
+            // Bot only works for Gold/Enterprise users
+            if (plan !== 'Gold' && plan !== 'Enterprise') {
+                return;
+            }
+
+            // 2. Fetch auto-responses from Supabase for this user
+            const { data: responses } = await supabase
+                .from('auto_responses')
+                .select('*')
+                .eq('user_id', userId);
+
+            if (responses && responses.length > 0) {
+                const matchedResponse = responses.find(r => incomingMsg.includes(r.keyword.toLowerCase()));
+                
+                if (matchedResponse) {
+                    console.log(`🤖 Auto-responding to ${msg.from} with keyword: ${matchedResponse.keyword}`);
+                    
+                    // Human-like delay before auto-reply
+                    await new Promise(r => setTimeout(r, Math.random() * 3000 + 2000));
+                    
+                    await msg.reply(matchedResponse.response);
+                    
+                    io.emit(`log_${userId}`, { 
+                        type: 'info', 
+                        msg: `🤖 Bot: Auto-replied to ${msg.from.split('@')[0]} (Keyword: ${matchedResponse.keyword})` 
+                    });
+                }
+            }
+        });
+
+        whatsappClient.on('auth_failure', (msg) => {
+            console.error("❌ Auth Failure:", msg);
+            isInitializing = false;
+            whatsappClient = null;
+            io.emit('whatsapp_error', { message: 'Auth failed' });
+        });
+
+        whatsappClient.on('disconnected', (reason) => {
+            console.log("🔌 WhatsApp Disconnected:", reason);
+            isInitializing = false;
+            whatsappClient = null;
+            lastQR = null;
+            io.emit('whatsapp_disconnected');
+        });
+
+        whatsappClient.initialize().catch(err => {
+            console.error("💥 Init Error:", err.message);
+            isInitializing = false;
+            whatsappClient = null;
+        });
     } catch (error) {
         console.error("❌ Failed to initialize WhatsApp:", error);
         io.emit('whatsapp_status', { msg: 'Error: Browser failed to start' });
         isInitializing = false;
         whatsappClient = null;
     }
-};
-
-    // --- AUTO-RESPONDER BOT (Keyword-based) ---
-    whatsappClient.on('message', async (msg) => {
-        if (msg.fromMe) return; // Don't respond to own messages
-        
-        const incomingMsg = msg.body.toLowerCase();
-        console.log(`📩 Received message from ${msg.from}: ${incomingMsg}`);
-
-        // 1. Fetch user data to check plan
-        const { data: userData } = await supabase.from('users').select('plan_name').eq('id', userId).single();
-        const plan = userData?.plan_name || 'Free';
-
-        // Bot only works for Gold/Enterprise users
-        if (plan !== 'Gold' && plan !== 'Enterprise') {
-            return;
-        }
-
-        // 2. Fetch auto-responses from Supabase for this user
-        const { data: responses } = await supabase
-            .from('auto_responses')
-            .select('*')
-            .eq('user_id', userId);
-
-        if (responses && responses.length > 0) {
-            const matchedResponse = responses.find(r => incomingMsg.includes(r.keyword.toLowerCase()));
-            
-            if (matchedResponse) {
-                console.log(`🤖 Auto-responding to ${msg.from} with keyword: ${matchedResponse.keyword}`);
-                
-                // Human-like delay before auto-reply
-                await new Promise(r => setTimeout(r, Math.random() * 3000 + 2000));
-                
-                await msg.reply(matchedResponse.response);
-                
-                io.emit(`log_${userId}`, { 
-                    type: 'info', 
-                    msg: `🤖 Bot: Auto-replied to ${msg.from.split('@')[0]} (Keyword: ${matchedResponse.keyword})` 
-                });
-            }
-        }
-    });
-
-    whatsappClient.on('auth_failure', (msg) => {
-        console.error("❌ Auth Failure:", msg);
-        isInitializing = false;
-        whatsappClient = null;
-        io.emit('whatsapp_error', { message: 'Auth failed' });
-    });
-
-    whatsappClient.on('disconnected', (reason) => {
-        console.log("🔌 WhatsApp Disconnected:", reason);
-        isInitializing = false;
-        whatsappClient = null;
-        lastQR = null;
-        io.emit('whatsapp_disconnected');
-    });
-
-    whatsappClient.initialize().catch(err => {
-        console.error("💥 Init Error:", err.message);
-        isInitializing = false;
-        whatsappClient = null;
-    });
 };
 
 io.on('connection', (socket) => {
