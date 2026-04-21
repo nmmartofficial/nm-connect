@@ -41,6 +41,10 @@ const initializeWhatsApp = async (userId) => {
 
     whatsappClient = new Client({
         authStrategy: new LocalAuth({ clientId: userId }),
+        webVersionCache: {
+            type: 'remote',
+            remotePath: 'https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/2.2412.54.html',
+        },
         puppeteer: {
             headless: true,
             args: [
@@ -48,14 +52,10 @@ const initializeWhatsApp = async (userId) => {
                 '--disable-setuid-sandbox',
                 '--disable-dev-shm-usage',
                 '--disable-accelerated-2d-canvas',
-                '--disable-gpu',
                 '--no-first-run',
                 '--no-zygote',
-                '--single-process',
-                '--disable-extensions',
-                '--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+                '--disable-gpu'
             ],
-            timeout: 60000, // Timeout badha diya taaki crash na ho
         }
     });
 
