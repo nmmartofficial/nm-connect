@@ -1,7 +1,12 @@
 import { createClient } from '@supabase/supabase-js';
 
-// Aapka URL aur Key jo aapne provide ki hai
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+if (!supabaseUrl || !supabaseAnonKey) {
+  console.error("❌ Supabase environment variables are MISSING! Check your .env or .env.local file.");
+} else {
+  console.log("✅ Supabase Client initialized with URL:", supabaseUrl);
+}
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
