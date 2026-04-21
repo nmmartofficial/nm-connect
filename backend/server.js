@@ -43,15 +43,24 @@ const initializeWhatsApp = async (userId) => {
     await new Promise(r => setTimeout(r, 2000));
 
     try {
+        console.log("📂 Checking for Chrome in local cache...");
+        const { join } = require('path');
+        const fs = require('fs');
+        
+        // Auto-detect chrome path on Render
+        let chromePath = process.env.PUPPETEER_EXECUTABLE_PATH;
+        if (!chromePath) {
+            const cachePath = join(__dirname, '.cache', 'puppeteer');
+            if (fs.existsSync(cachePath)) {
+                console.log("✅ Puppeteer cache found at:", cachePath);
+            }
+        }
+
         whatsappClient = new Client({
             authStrategy: new LocalAuth({ 
                 clientId: userId,
                 dataPath: './.wwebjs_auth' 
             }),
-            webVersionCache: {
-                type: 'remote',
-                remotePath: 'https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/2.3000.1014133536-alpha.html',
-            },
             puppeteer: {
                 headless: true,
                 args: [
@@ -65,7 +74,7 @@ const initializeWhatsApp = async (userId) => {
                     '--single-process',
                     '--js-flags="--max-old-space-size=256"'
                 ],
-                executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || null,
+                executablePath: chromePath || null,
             }
         });
 
