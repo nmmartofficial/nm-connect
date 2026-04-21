@@ -24,6 +24,7 @@ export default function SessionManager({ userId, socket, onStatusChange }) {
 
     // QR Code milne par
     socket.on(`qr_${userId}`, (qr) => {
+      console.log("✅ QR Code Received from Backend");
       setQrCode(qr);
       setWsStatus('Scan QR Now');
       setLoading(false);
@@ -31,6 +32,7 @@ export default function SessionManager({ userId, socket, onStatusChange }) {
 
     // WhatsApp Ready hone par
     socket.on(`ready_${userId}`, () => {
+      console.log("🚀 WhatsApp is Ready!");
       setQrCode(null);
       setWsStatus('Connected ✅');
       setLoading(false);

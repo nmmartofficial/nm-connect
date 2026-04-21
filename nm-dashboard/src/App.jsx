@@ -11,8 +11,9 @@ import * as XLSX from 'xlsx';
 import SessionManager from './SessionManager'; 
 import Login from './components/Login';
 
-// --- VERCEL/PRODUCTION FIX ---
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || (window.location.hostname === 'localhost' ? "http://localhost:3001" : "https://nm-connect-backend.onrender.com");
+// --- LOCAL/PRODUCTION AUTO-DETECT ---
+const BACKEND_URL = window.location.hostname === 'localhost' ? "http://localhost:3001" : (import.meta.env.VITE_BACKEND_URL || "https://nm-connect-backend.onrender.com");
+console.log("📍 API Backend URL in use:", BACKEND_URL);
 
 export default function App() {
   const [session, setSession] = useState(null);
@@ -70,6 +71,7 @@ export default function App() {
     fetchCustomers();
     
     socket.on('connect', () => {
+      console.log("🟢 Socket Connected, requesting session...");
       socket.emit('init-session', USER_ID);
     });
 
