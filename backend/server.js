@@ -43,7 +43,8 @@ const createSession = (userId) => {
                 '--no-first-run',
                 '--no-zygote',
                 '--single-process',
-                '--disable-gpu'
+                '--disable-gpu',
+                '--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
             ],
         }
     });
@@ -144,18 +145,24 @@ app.post('/api/send-bulk', async (req, res) => {
         try {
             let msg = messages[Math.floor(Math.random() * messages.length)];
             
-            // Variable Parsing (e.g., {name})
+            // Personalization
             if (contact.name) {
                 msg = msg.replace(/{name}/g, contact.name);
             }
+
+            // --- ANTI-BAN SPINNING ---
+            // Message ke aakhir mein random hidden character ya timestamp add karna
+            // taaki har message unique dikhe WhatsApp robot ko
+            const randomString = Math.random().toString(36).substring(7);
+            const finalMsg = `${msg}\n\n_${randomString}_`;
 
             const cleanNumber = contact.number.replace(/\D/g, '');
             const chatId = `${cleanNumber}@c.us`;
             
             if (messageMedia) {
-                await client.sendMessage(chatId, messageMedia, { caption: msg });
+                await client.sendMessage(chatId, messageMedia, { caption: finalMsg });
             } else {
-                await client.sendMessage(chatId, msg);
+                await client.sendMessage(chatId, finalMsg);
             }
             
             // Update Supabase status
@@ -170,8 +177,10 @@ app.post('/api/send-bulk', async (req, res) => {
                 contactId: contact.id 
             });
             
-            // 4-second delay requested by user
-            await new Promise(resolve => setTimeout(resolve, 4000)); 
+            // --- DYNAMIC DELAY (8 to 15 seconds) ---
+            // Fixed delay se robot pakad leta hai, isliye hum range use kar rahe hain
+            const dynamicDelay = Math.floor(Math.random() * (15000 - 8000 + 1)) + 8000;
+            await new Promise(resolve => setTimeout(resolve, dynamicDelay)); 
         } catch (err) {
             console.error(`Error sending to ${contact.number}:`, err);
             io.emit(`log_${userId}`, { 
