@@ -37,56 +37,69 @@ const initializeWhatsApp = async (userId) => {
 
     isInitializing = true;
     console.log(`🛠️ Initializing WhatsApp for user: ${userId}`);
+    io.emit('whatsapp_status', { msg: 'Starting Browser Engine...' });
 
     // Thoda delay taaki purana process release ho jaye
     await new Promise(r => setTimeout(r, 2000));
 
-    whatsappClient = new Client({
-        authStrategy: new LocalAuth({ 
-            clientId: userId,
-            dataPath: './.wwebjs_auth' 
-        }),
-        webVersionCache: {
-            type: 'remote',
-            remotePath: 'https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/2.2412.54.html',
-        },
-        puppeteer: {
-            headless: true,
-            args: [
-                '--no-sandbox',
-                '--disable-setuid-sandbox',
-                '--disable-dev-shm-usage',
-                '--disable-accelerated-2d-canvas',
-                '--no-first-run',
-                '--no-zygote',
-                '--disable-gpu',
-                '--single-process'
-            ],
-            executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || null,
-        }
-    });
+    try {
+        whatsappClient = new Client({
+            authStrategy: new LocalAuth({ 
+                clientId: userId,
+                dataPath: './.wwebjs_auth' 
+            }),
+            webVersionCache: {
+                type: 'remote',
+                remotePath: 'https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/2.2412.54.html',
+            },
+            puppeteer: {
+                headless: true,
+                args: [
+                    '--no-sandbox',
+                    '--disable-setuid-sandbox',
+                    '--disable-dev-shm-usage',
+                    '--disable-accelerated-2d-canvas',
+                    '--no-first-run',
+                    '--no-zygote',
+                    '--disable-gpu',
+                    '--single-process'
+                ],
+                executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || null,
+            }
+        });
 
-    whatsappClient.on('qr', async (qr) => {
-        console.log("✅ QR Code Generated. Please scan now.");
-        io.emit('whatsapp_status', { msg: 'QR Code Generated! Please scan.' });
-        lastQR = await qrcode.toDataURL(qr);
-        io.emit('qr_update', { qr: lastQR, userId });
-    });
+        io.emit('whatsapp_status', { msg: 'Connecting to WhatsApp...' });
 
-    whatsappClient.on('authenticated', () => {
-        console.log("� Authenticated successfully! Loading chats...");
-        io.emit('whatsapp_status', { msg: 'Authenticated! Loading chats...' });
-        lastQR = null;
-        io.emit('whatsapp_authenticated', { userId });
-    });
+        whatsappClient.on('qr', async (qr) => {
+            console.log("✅ QR Code Generated. Please scan now.");
+            io.emit('whatsapp_status', { msg: 'QR Code Generated! Please scan.' });
+            lastQR = await qrcode.toDataURL(qr);
+            io.emit('qr_update', { qr: lastQR, userId });
+        });
 
-    whatsappClient.on('ready', () => {
-        console.log("� WhatsApp Client is Ready and Connected!");
-        io.emit('whatsapp_status', { msg: 'WhatsApp is Ready!' });
+        whatsappClient.on('authenticated', () => {
+            console.log("� Authenticated successfully! Loading chats...");
+            io.emit('whatsapp_status', { msg: 'Authenticated! Loading chats...' });
+            lastQR = null;
+            io.emit('whatsapp_authenticated', { userId });
+        });
+
+        whatsappClient.on('ready', () => {
+            console.log("� WhatsApp Client is Ready and Connected!");
+            io.emit('whatsapp_status', { msg: 'WhatsApp is Ready!' });
+            isInitializing = false;
+            lastQR = null;
+            io.emit('whatsapp_ready', { userId });
+        });
+
+        // ... existing listeners ...
+    } catch (error) {
+        console.error("❌ Failed to initialize WhatsApp:", error);
+        io.emit('whatsapp_status', { msg: 'Error: Browser failed to start' });
         isInitializing = false;
-        lastQR = null;
-        io.emit('whatsapp_ready', { userId });
-    });
+        whatsappClient = null;
+    }
+};
 
     // --- AUTO-RESPONDER BOT (Keyword-based) ---
     whatsappClient.on('message', async (msg) => {
