@@ -8,8 +8,8 @@
     "backend": "cd backend && npm start",
     "frontend": "cd nm-dashboard && npm run dev",
     "dev": "concurrently \"npm run backend\" \"npm run frontend\"",
-    "build": "cd nm-dashboard && npm run build",
-    "build:frontend": "cd nm-dashboard && npm run build"
+    "build": "cd nm-dashboard && npm install && npm run build",
+    "build:frontend": "cd nm-dashboard && npm install && npm run build"
   },
   "devDependencies": {
     "concurrently": "^8.2.2"
