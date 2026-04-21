@@ -125,14 +125,23 @@ const handleSessionRequest = (userId, socket) => {
 
 app.post('/api/send-bulk', async (req, res) => {
     const { contacts, messages, userId, media } = req.body;
+    console.log(`📩 Bulk Send Request received for user: ${userId} with ${contacts.length} contacts`);
     
-    if (!whatsappClient) return res.status(400).json({ error: "WhatsApp not connected" });
+    if (!whatsappClient) {
+        console.error("❌ Bulk Send Failed: WhatsApp not connected");
+        return res.status(400).json({ error: "WhatsApp not connected" });
+    }
 
     res.json({ status: "Campaign Started" });
 
     let messageMedia = null;
     if (media && media.data) {
-        messageMedia = new MessageMedia(media.mimetype, media.data, media.filename);
+        try {
+            messageMedia = new MessageMedia(media.mimetype, media.data, media.filename);
+            console.log("📎 Media attached to campaign");
+        } catch (mediaErr) {
+            console.error("❌ Media creation error:", mediaErr.message);
+        }
     }
 
     for (const contact of contacts) {
@@ -142,7 +151,10 @@ app.post('/api/send-bulk', async (req, res) => {
             
             const randomString = Math.random().toString(36).substring(7);
             const finalMsg = `${msg}\n\n_${randomString}_`;
-            const chatId = `${contact.number.replace(/\D/g, '')}@c.us`;
+            const cleanNumber = contact.number.toString().replace(/\D/g, '');
+            const chatId = `${cleanNumber}@c.us`;
+
+            console.log(`📤 Sending to ${cleanNumber}...`);
 
             if (messageMedia) {
                 await whatsappClient.sendMessage(chatId, messageMedia, { caption: finalMsg });
@@ -150,15 +162,24 @@ app.post('/api/send-bulk', async (req, res) => {
                 await whatsappClient.sendMessage(chatId, finalMsg);
             }
 
+            console.log(`✅ Message sent to ${cleanNumber}`);
+
             await supabase.from('customers').update({ status: 'Sent' }).eq('id', contact.id);
+            
+            // Emit logs using both old and new event names for safety
             io.emit('campaign_log', { type: 'success', msg: `Sent to ${contact.number}` });
+            io.emit(`log_${userId}`, { type: 'success', msg: `Sent to ${contact.number}` });
 
             const delay = Math.floor(Math.random() * (15000 - 8000 + 1)) + 8000;
+            console.log(`⏳ Waiting ${delay/1000}s for next message...`);
             await new Promise(r => setTimeout(r, delay));
         } catch (err) {
+            console.error(`❌ Failed to send to ${contact.number}:`, err.message);
             io.emit('campaign_log', { type: 'error', msg: `Failed: ${contact.number}` });
+            io.emit(`log_${userId}`, { type: 'error', msg: `Failed: ${contact.number}` });
         }
     }
+    console.log("🏁 Campaign finished");
 });
 
 const PORT = process.env.PORT || 3001;

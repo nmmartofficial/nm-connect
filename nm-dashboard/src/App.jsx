@@ -79,10 +79,17 @@ export default function App() {
     socket.on(`disconnected_${USER_ID}`, () => setIsWhatsAppReady(false));
     
     socket.on(`log_${USER_ID}`, (newLog) => {
+      console.log("📝 Received log via user event:", newLog);
       setLogs(prev => [{ ...newLog, time: new Date().toLocaleTimeString() }, ...prev].slice(0, 50));
       if (newLog.type === 'success') {
           fetchCustomers();
       }
+    });
+
+    socket.on('campaign_log', (newLog) => {
+      console.log("📝 Received log via campaign_log event:", newLog);
+      setLogs(prev => [{ ...newLog, time: new Date().toLocaleTimeString() }, ...prev].slice(0, 50));
+      fetchCustomers();
     });
 
     return () => {
