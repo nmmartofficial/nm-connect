@@ -26,107 +26,125 @@ const supabase = createClient(
 );
 
 const sessions = {};
+const initializingSessions = new Set();
 
 // --- WHATSAPP SETUP ---
-const createSession = (userId) => {
-    console.log(`Creating session for: ${userId}`);
+const createSession = async (userId) => {
+    if (initializingSessions.has(userId)) {
+        console.log(`⏳ Session for ${userId} is already initializing...`);
+        return;
+    }
+
+    console.log(`🛠️ Creating session for: ${userId}`);
+    initializingSessions.add(userId);
     
-    const client = new Client({
-        authStrategy: new LocalAuth({ clientId: userId }),
-        puppeteer: {
-            headless: true,
-            args: [
-                '--no-sandbox',
-                '--disable-setuid-sandbox',
-                '--disable-dev-shm-usage',
-                '--disable-accelerated-2d-canvas',
-                '--no-first-run',
-                '--no-zygote',
-                '--single-process',
-                '--disable-gpu',
-                '--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-            ],
-        }
-    });
-
-    client.on('qr', (qr) => {
-        console.log(`✅ QR Generated for ${userId}`);
-        io.emit(`qr_${userId}`, qr);
-    });
-
-    client.on('ready', () => {
-        console.log(`🚀 WhatsApp Ready for ${userId}`);
-        io.emit(`ready_${userId}`, { status: 'connected' });
-    });
-
-    client.on('authenticated', () => {
-        console.log(`Authenticated ${userId}`);
-        io.emit(`authenticated_${userId}`);
-    });
-
-    client.on('auth_failure', (msg) => {
-        console.error(`Auth Failure ${userId}:`, msg);
-        io.emit(`error_${userId}`, 'Authentication failed');
-    });
-
-    client.on('disconnected', (reason) => {
-        console.log(`Disconnected ${userId}:`, reason);
-        io.emit(`disconnected_${userId}`);
-        delete sessions[userId];
-        client.initialize().catch(err => console.error("Re-init Error:", err));
-    });
-
-    client.on('message', async (msg) => {
-        const text = msg.body.toLowerCase();
-        
-        // Simple Auto-Responder logic
-        const responses = {
-            'hi': 'Hello! Welcome to NM CONNECT. How can we help you today?',
-            'hello': 'Hi there! NM CONNECT v5.0 is at your service.',
-            'price': 'Our plans start from ₹499/mo. Check our dashboard for details!',
-            'help': 'You can use NM CONNECT for bulk WhatsApp marketing, auto-replies, and analytics.',
-        };
-
-        for (const [keyword, response] of Object.entries(responses)) {
-            if (text.includes(keyword)) {
-                await msg.reply(response);
-                io.emit(`log_${userId}`, { 
-                    type: 'info', 
-                    msg: `Auto-replied to ${msg.from} for keyword: ${keyword}`,
-                    time: new Date().toLocaleTimeString() 
-                });
-                break;
+    try {
+        const client = new Client({
+            authStrategy: new LocalAuth({ clientId: userId }),
+            puppeteer: {
+                headless: true,
+                args: [
+                    '--no-sandbox',
+                    '--disable-setuid-sandbox',
+                    '--disable-dev-shm-usage',
+                    '--disable-accelerated-2d-canvas',
+                    '--no-first-run',
+                    '--no-zygote',
+                    '--single-process',
+                    '--disable-gpu',
+                    '--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+                ],
             }
-        }
-    });
+        });
 
-    client.initialize().catch(err => console.error("Init Error:", err));
-    sessions[userId] = client;
+        client.on('qr', (qr) => {
+            console.log(`✅ QR Generated for ${userId}`);
+            qrcode.toDataURL(qr, (err, url) => {
+                io.emit(`qr_${userId}`, url);
+            });
+        });
+
+        client.on('ready', () => {
+            console.log(`🚀 WhatsApp Ready for ${userId}`);
+            initializingSessions.delete(userId);
+            io.emit(`ready_${userId}`, { status: 'connected' });
+        });
+
+        client.on('authenticated', () => {
+            console.log(`🔓 Authenticated ${userId}`);
+        });
+
+        client.on('auth_failure', (msg) => {
+            console.error(`❌ Auth Failure ${userId}:`, msg);
+            initializingSessions.delete(userId);
+            io.emit(`error_${userId}`, 'Authentication failed');
+        });
+
+        client.on('disconnected', (reason) => {
+            console.log(`🔌 Disconnected ${userId}:`, reason);
+            io.emit(`disconnected_${userId}`);
+            delete sessions[userId];
+            initializingSessions.delete(userId);
+        });
+
+        client.on('message', async (msg) => {
+            const text = msg.body.toLowerCase();
+            
+            // Simple Auto-Responder logic
+            const responses = {
+                'hi': 'Hello! Welcome to NM CONNECT. How can we help you today?',
+                'hello': 'Hi there! NM CONNECT v5.0 is at your service.',
+                'price': 'Our plans start from ₹499/mo. Check our dashboard for details!',
+                'help': 'You can use NM CONNECT for bulk WhatsApp marketing, auto-replies, and analytics.',
+            };
+
+            for (const [keyword, response] of Object.entries(responses)) {
+                if (text.includes(keyword)) {
+                    await msg.reply(response);
+                    io.emit(`log_${userId}`, { 
+                        type: 'info', 
+                        msg: `Auto-replied to ${msg.from} for keyword: ${keyword}`,
+                        time: new Date().toLocaleTimeString() 
+                    });
+                    break;
+                }
+            }
+        });
+
+        await client.initialize();
+        sessions[userId] = client;
+    } catch (err) {
+        console.error(`💥 Init Error for ${userId}:`, err.message);
+        initializingSessions.delete(userId);
+        io.emit(`error_${userId}`, 'Failed to initialize WhatsApp');
+    }
 };
 
 // --- SOCKET LOGIC ---
 io.on('connection', (socket) => {
-    console.log('New client connected');
+    console.log('🔌 New client connected');
     
-    socket.on('init-session', (userId) => {
+    socket.on('init-session', async (userId) => {
         console.log(`📩 Received init-session for: ${userId}`);
         if (!userId) return;
-        if (!sessions[userId]) {
-            createSession(userId);
-        } else {
-            console.log(`🔄 Session already exists for ${userId}, checking state...`);
-            sessions[userId].getState().then(state => {
+
+        if (sessions[userId]) {
+            try {
+                const state = await sessions[userId].getState();
                 console.log(`📡 Current state for ${userId}: ${state}`);
                 if (state === 'CONNECTED') {
-                    io.emit(`ready_${userId}`);
-                } else {
-                    // Re-emit QR if available (optional, but client might need it)
-                    // createSession(userId); 
+                    return io.emit(`ready_${userId}`);
                 }
-            }).catch(() => {
-                console.log(`⚠️ State check failed for ${userId}, re-creating session...`);
-                createSession(userId);
-            });
+            } catch (e) {
+                console.log(`⚠️ State check failed, cleaning up session...`);
+                delete sessions[userId];
+            }
+        }
+
+        if (!initializingSessions.has(userId)) {
+            createSession(userId);
+        } else {
+            console.log(`⏳ Session already initializing for ${userId}`);
         }
     });
 
