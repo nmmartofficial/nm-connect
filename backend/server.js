@@ -50,12 +50,12 @@ const createSession = (userId) => {
     });
 
     client.on('qr', (qr) => {
-        console.log(`QR Generated for ${userId}`);
+        console.log(`✅ QR Generated for ${userId}`);
         io.emit(`qr_${userId}`, qr);
     });
 
     client.on('ready', () => {
-        console.log(`WhatsApp Ready for ${userId}`);
+        console.log(`🚀 WhatsApp Ready for ${userId}`);
         io.emit(`ready_${userId}`, { status: 'connected' });
     });
 
@@ -109,14 +109,22 @@ io.on('connection', (socket) => {
     console.log('New client connected');
     
     socket.on('init-session', (userId) => {
+        console.log(`📩 Received init-session for: ${userId}`);
         if (!userId) return;
         if (!sessions[userId]) {
             createSession(userId);
         } else {
+            console.log(`🔄 Session already exists for ${userId}, checking state...`);
             sessions[userId].getState().then(state => {
-                if (state === 'CONNECTED') io.emit(`ready_${userId}`);
+                console.log(`📡 Current state for ${userId}: ${state}`);
+                if (state === 'CONNECTED') {
+                    io.emit(`ready_${userId}`);
+                } else {
+                    // Re-emit QR if available (optional, but client might need it)
+                    // createSession(userId); 
+                }
             }).catch(() => {
-                // If state check fails, assume disconnected
+                console.log(`⚠️ State check failed for ${userId}, re-creating session...`);
                 createSession(userId);
             });
         }
