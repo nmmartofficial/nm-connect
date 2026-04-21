@@ -12,10 +12,22 @@ export default function Login({ onLoginSuccess }) {
     e.preventDefault();
     setLoading(true);
     setError(null);
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) setError(error.message);
-    else onLoginSuccess(data.user);
-    setLoading(false);
+    console.log("Attempting login with:", email);
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) {
+        console.error("Login error:", error.message);
+        setError(error.message);
+      } else {
+        console.log("Login success:", data.user);
+        onLoginSuccess(data.user);
+      }
+    } catch (err) {
+      console.error("Unexpected error during login:", err);
+      setError("An unexpected error occurred");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
