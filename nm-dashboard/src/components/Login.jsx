@@ -24,7 +24,7 @@ export default function Login({ onLoginSuccess }) {
       }
     } catch (err) {
       console.error("Unexpected error during login:", err);
-      setError("An unexpected error occurred");
+      setError("Network Error: " + (err.message || "Failed to fetch"));
     } finally {
       setLoading(false);
     }
