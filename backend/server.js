@@ -517,6 +517,7 @@ const startCampaign = async (userId, contacts, messages, media, startIndex, camp
             ];
             const closing = closings[Math.floor(Math.random() * closings.length)];
 
+            // --- THE GHOST-HUMAN ENGINE (TOTAL RANDOMIZATION) ---
             const spinMessage = (text) => {
                 return text.replace(/{([^{}]+)}/g, (match, options) => {
                     const choices = options.split('|');
@@ -528,27 +529,46 @@ const startCampaign = async (userId, contacts, messages, media, startIndex, camp
             if (contact.name) msg = msg.replace(/{name}/g, contact.name);
             msg = spinMessage(msg); 
 
+            // A. Randomize Professional Closings & Reference Codes
+            const offerCode = `NM${Math.floor(1000 + Math.random() * 9000)}`;
+            const closings = [
+                `\n\n*Ref: ${offerCode}*`,
+                `\n\n(Offer Code: ${offerCode})`,
+                `\n\n[Reference: ${offerCode}]`,
+                `\n\n_Ref No: ${offerCode}_`,
+                `\n\n*Regards, NM Mart*`,
+                `\n\n_Thank you for choosing NM Mart!_`,
+                `\n\nHave a great day!`,
+                `\n\n- Team NM Mart`,
+                `\n\nRef ID: #${Math.random().toString(36).substring(7).toUpperCase()}`
+            ];
+            const closing = closings[Math.floor(Math.random() * closings.length)];
             const finalMsg = `${msg}${closing}`;
 
-            // Simulate Human Behavior
-            await whatsappClient.sendPresenceUpdate('available', chatId);
-            io.emit(`log_${userId}`, { type: 'info', msg: `📖 Checking chat with ${contact.number}...` });
+            // B. Randomized Presence Simulation (Don't always follow the same steps)
+            const presenceSequence = Math.random();
+            if (presenceSequence > 0.2) {
+                await whatsappClient.sendPresenceUpdate('available', chatId);
+                await new Promise(r => setTimeout(r, Math.random() * 3000 + 500)); 
+            }
             
-            await new Promise(r => setTimeout(r, Math.random() * 2000 + 500)); 
-            
-            await whatsappClient.sendPresenceUpdate('composing', chatId);
-            const typingTime = Math.min(finalMsg.length * (Math.random() * 25 + 15), 5000); 
-            io.emit(`log_${userId}`, { type: 'info', msg: `✍️ Typing personalized offer...` });
-            await new Promise(r => setTimeout(r, typingTime));
+            if (presenceSequence > 0.4) {
+                await whatsappClient.sendPresenceUpdate('composing', chatId);
+                // Randomized Typing Speed (Slow, Fast, Variable)
+                const typingMultiplier = Math.random() * 40 + 10; 
+                const typingTime = Math.min(finalMsg.length * typingMultiplier, 7000); 
+                io.emit(`log_${userId}`, { type: 'info', msg: `✍️ Typing...` });
+                await new Promise(r => setTimeout(r, typingTime));
+            }
 
-            await new Promise(r => setTimeout(r, Math.random() * 1500 + 500));
+            // C. Final random pause before "Clicking Send"
+            await new Promise(r => setTimeout(r, Math.random() * 2000 + 200));
 
             if (mediaBuffer) {
                 const sendMsg = {};
                 sendMsg[mediaType] = mediaBuffer;
                 sendMsg.caption = finalMsg;
                 if (mediaType === 'document') sendMsg.fileName = media.filename || 'document';
-                
                 await whatsappClient.sendMessage(chatId, sendMsg);
             } else {
                 await whatsappClient.sendMessage(chatId, { text: finalMsg });
@@ -557,8 +577,12 @@ const startCampaign = async (userId, contacts, messages, media, startIndex, camp
             sentCount++;
             console.log(`✅ Message sent to ${cleanNumber}`);
 
+            // D. Randomize "Post-Send" Presence
+            if (Math.random() < 0.3) {
+                await whatsappClient.sendPresenceUpdate('unavailable', chatId);
+            }
+
             await supabase.from('customers').update({ status: 'Sent' }).eq('id', contact.id);
-            
             if (campaignId) {
                 await supabase.from('campaigns').update({ sent_count: sentCount, invalid_count: invalidCount }).eq('id', campaignId);
             }
@@ -569,40 +593,34 @@ const startCampaign = async (userId, contacts, messages, media, startIndex, camp
                 progress: { current: i + 1, total: contacts.length, sent: sentCount, invalid: invalidCount, lastIndex: i }
             });
 
-            // --- THE ULTRA-HUMAN CHAOS ENGINE (NO PATTERNS) ---
+            // E. --- THE CHAOS DELAY LOGIC (ZERO PATTERNS) ---
             let delay;
             const seed = Math.random();
-            
-            // 1. Primary Delay (20-60s) - Base delay for every message
-            const baseDelay = Math.floor(Math.random() * (60000 - 20000 + 1)) + 20000;
-            
-            // 2. The "Micro-Distraction" (Every few messages, 1-3 mins)
-            if (seed < 0.15 && sentCount % 7 === 0) {
-                const microBreak = Math.floor(Math.random() * (180000 - 60000 + 1)) + 60000;
-                delay = baseDelay + microBreak;
-                console.log(`� Micro-distraction: Extra ${microBreak/1000}s break...`);
+            const clusterSize = Math.floor(Math.random() * 4) + 2; // Cluster size 2 to 5
+
+            // 1. Cluster Break: After sending a few messages, take a random "distraction" break
+            if (sentCount % clusterSize === 0) {
+                const clusterBreak = Math.floor(Math.random() * (120000 - 40000 + 1)) + 40000;
+                delay = clusterBreak;
+                console.log(`☕ Cluster break: ${delay/1000}s...`);
             } 
-            // 3. The "Human Fluctuator" (Completely random spikes in delay)
-            else if (seed < 0.08) {
-                const randomSpike = Math.floor(Math.random() * (300000 - 120000 + 1)) + 120000;
-                delay = randomSpike;
-                console.log(`🤔 Thinking/Reading: Random spike of ${delay/1000}s...`);
+            // 2. The "Phone Lock" Break (10% chance, 3-7 minutes)
+            else if (seed < 0.10) {
+                delay = Math.floor(Math.random() * (420000 - 180000 + 1)) + 180000;
+                console.log(`📱 Phone Locked: ${delay/1000}s break...`);
             }
-            // 4. The "Cluster logic" (Send 2-3 messages fast, then a longer pause)
-            else if (sentCount % 4 === 0) {
-                delay = Math.floor(Math.random() * (90000 - 45000 + 1)) + 45000;
-            }
+            // 3. Variable Base Delay (25-75s)
             else {
-                delay = baseDelay;
+                delay = Math.floor(Math.random() * (75000 - 25000 + 1)) + 25000;
             }
 
-            // 5. Time-of-Day slowdown (Slower at night, faster in day - Mock logic)
-            const hour = new Date().getHours();
-            if (hour < 8 || hour > 22) {
-                delay *= 1.5; // Slow down by 50% during "sleeping hours"
+            // 4. Global Hourly Slowdown (Sometimes we just get slow)
+            if (Math.random() < 0.05) {
+                delay += 300000; // Extra 5 min random lag
+                console.log(`🐌 Unexpected human lag: +300s`);
             }
 
-            console.log(`⏳ Waiting ${delay/1000}s for next message...`);
+            console.log(`⏳ Next in ${delay/1000}s...`);
             await new Promise(r => setTimeout(r, delay));
    
         } catch (err) {
