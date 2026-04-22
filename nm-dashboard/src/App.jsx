@@ -143,7 +143,7 @@ export default function App() {
     if (!USER_ID || !session?.user?.email) return;
     
     const userEmail = session.user.email.toLowerCase().trim();
-    const isAdmin = userEmail === 'nmmart07@gmail.com' || userEmail === 'abduls9125@gmail.com';
+    const isAdmin = userEmail === 'nmmart07@gmail.com' || userEmail === 'abduls9125@gmail.com' || USER_ID === '56733041-8c04-4a55-bb82-8030e739297d';
 
     if (isAdmin) {
       setUserPlan({ name: 'Enterprise', limit: 999999 });
@@ -152,12 +152,23 @@ export default function App() {
 
     const { data, error } = await supabase
       .from('users')
-      .select('plan_name, daily_limit')
+      .select('*')
       .eq('id', USER_ID)
       .single();
     
     if (!error && data) {
-      setUserPlan({ name: data.plan_name, limit: data.daily_limit });
+      if (data.plan_name === 'Trial') {
+        const now = new Date();
+        const expiry = new Date(data.trial_expires_at);
+        if (now > expiry) {
+          setUserPlan({ name: 'Free', limit: 50 });
+        } else {
+          const daysLeft = Math.ceil((expiry - now) / (1000 * 60 * 60 * 24));
+          setUserPlan({ name: `Free Trial (${daysLeft} days left)`, limit: data.daily_limit || 100 });
+        }
+      } else {
+        setUserPlan({ name: data.plan_name, limit: data.daily_limit });
+      }
     }
   };
 

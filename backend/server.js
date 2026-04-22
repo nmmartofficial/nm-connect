@@ -267,8 +267,20 @@ const initializeWhatsApp = async (userId) => {
                     userIsAdmin = adminIds.includes(userId);
 
                     // Fetch plan from DB
-                    const { data: userData } = await supabase.from('users').select('plan_name').eq('id', userId).single();
-                    userPlan = userData?.plan_name || 'Free';
+                    let { data: userData } = await supabase.from('users').select('*').eq('id', userId).single();
+                    
+                    // Trial Logic for AI Bot
+                    if (userData?.plan_name === 'Trial') {
+                        const now = new Date();
+                        const expiry = new Date(userData.trial_expires_at);
+                        if (now > expiry) {
+                            userPlan = 'Free';
+                        } else {
+                            userPlan = 'Monthly'; // Give Monthly features during trial
+                        }
+                    } else {
+                        userPlan = userData?.plan_name || 'Free';
+                    }
                     
                     console.log(`📊 Auth Check: ID=${userId} | Admin=${userIsAdmin} | Plan=${userPlan}`);
                 } catch (err) {
@@ -505,27 +517,57 @@ app.post('/api/send-bulk', async (req, res) => {
         }
     }
     
-    // --- PLAN CHECKING LOGIC ---
+// --- PLAN CHECKING LOGIC ---
     let plan = 'Free';
     let limit = 50;
     
-    // 1. Direct Email Check (From Request Body - Fastest)
-    const normalizedBodyEmail = (bodyEmail || '').toLowerCase().trim();
-    let isAdmin = normalizedBodyEmail === 'nmmart07@gmail.com' || normalizedBodyEmail === 'abduls9125@gmail.com';
-
-    // 2. Database Check (Fallback and for non-admins)
+    // 1. Database Check (Now with 3-day Free Trial Logic)
     try {
-        const { data: userData } = await supabase.from('users').select('plan_name, daily_limit, email').eq('id', userId).single();
+        let { data: userData, error: fetchError } = await supabase.from('users').select('*').eq('id', userId).single();
         
-        const dbEmail = (userData?.email || '').toLowerCase().trim();
-        if (!isAdmin) {
-            isAdmin = dbEmail === 'nmmart07@gmail.com' || dbEmail === 'abduls9125@gmail.com';
+        // If user doesn't exist in 'public.users', create them with a 3-day trial
+        if (!userData || fetchError) {
+            console.log(`🆕 New user detected: ${userId}. Assigning 3-day trial...`);
+            const trialExpiry = new Date();
+            trialExpiry.setDate(trialExpiry.getDate() + 3);
+
+            const { data: newUser, error: insertError } = await supabase
+                .from('users')
+                .insert([{ 
+                    id: userId, 
+                    plan_name: 'Trial', 
+                    daily_limit: 100, // Same as Monthly plan
+                    trial_expires_at: trialExpiry.toISOString()
+                }])
+                .select()
+                .single();
+            
+            if (!insertError) userData = newUser;
         }
 
-        plan = userData?.plan_name || 'Free';
-        limit = userData?.daily_limit || 50;
+        // Check if trial has expired
+        if (userData?.plan_name === 'Trial') {
+            const now = new Date();
+            const expiry = new Date(userData.trial_expires_at);
+            
+            if (now > expiry) {
+                console.log(`⏰ Trial expired for user ${userId}. Reverting to Free.`);
+                await supabase.from('users').update({ plan_name: 'Free', daily_limit: 50 }).eq('id', userId);
+                plan = 'Free';
+                limit = 50;
+            } else {
+                plan = 'Monthly'; // Treat Trial as Monthly plan features
+                limit = userData.daily_limit || 100;
+            }
+        } else {
+            plan = userData?.plan_name || 'Free';
+            limit = userData?.daily_limit || 50;
+        }
+
+        const dbEmail = (userData?.email || '').toLowerCase().trim();
+        isAdmin = dbEmail === 'nmmart07@gmail.com' || dbEmail === 'abduls9125@gmail.com' || userId === '56733041-8c04-4a55-bb82-8030e739297d';
     } catch (err) {
-        console.error("⚠️ Supabase User Fetch Failed:", err.message);
+        console.error("⚠️ Supabase User Logic Failed:", err.message);
     }
 
     // --- ADMIN OVERRIDE: Unlock everything for YOU ---
