@@ -42,6 +42,8 @@ export default function App() {
   const [newAutoResponse, setNewAutoResponse] = useState({ keyword: '', response: '' });
   const [inventory, setInventory] = useState([]);
   const [newInventory, setNewInventory] = useState({ product_name: '', mrp: '', sale_price: '', discount: '' });
+  const [businessName, setBusinessName] = useState('');
+  const [isUpdatingName, setIsUpdatingName] = useState(false);
 
   const fetchInventory = async () => {
     if (!USER_ID) return;
@@ -240,6 +242,7 @@ export default function App() {
       .single();
     
     if (!error && data) {
+      setBusinessName(data.business_name || '');
       if (data.plan_name === 'Trial') {
         const now = new Date();
         const expiry = new Date(data.trial_expires_at);
@@ -252,6 +255,25 @@ export default function App() {
       } else {
         setUserPlan({ name: data.plan_name, limit: data.daily_limit });
       }
+    }
+  };
+
+  const updateBusinessName = async () => {
+    if (!USER_ID) return;
+    setIsUpdatingName(true);
+    try {
+      const { error } = await supabase
+        .from('users')
+        .update({ business_name: businessName })
+        .eq('id', USER_ID);
+      
+      if (error) throw error;
+      alert("Business Name updated successfully!");
+    } catch (err) {
+      console.error("❌ Update Error:", err);
+      alert("Failed to update business name. " + err.message);
+    } finally {
+      setIsUpdatingName(false);
     }
   };
 
@@ -585,6 +607,10 @@ export default function App() {
 
           <button onClick={() => setActiveTab('billing')} className={`w-full flex items-center gap-3 p-3 rounded-xl font-bold transition-all ${activeTab === 'billing' ? 'bg-blue-600 text-white' : 'hover:bg-slate-800 text-slate-400'}`}>
             <CreditCard size={18}/> Pricing & Plans
+          </button>
+
+          <button onClick={() => setActiveTab('settings')} className={`w-full flex items-center gap-3 p-3 rounded-xl font-bold transition-all ${activeTab === 'settings' ? 'bg-blue-600 text-white' : 'hover:bg-slate-800 text-slate-400'}`}>
+            <Settings size={18}/> Profile Settings
           </button>
         </nav>
 
@@ -1330,6 +1356,58 @@ export default function App() {
                                 </li>
                             </ul>
                             <button className="w-full bg-slate-800 hover:bg-slate-700 text-white font-black py-3 rounded-xl uppercase tracking-widest text-xs transition-all">Get in Touch</button>
+                        </div>
+                    </div>
+                </div>
+            ) : activeTab === 'settings' ? (
+                /* SETTINGS / PROFILE TAB */
+                <div className="max-w-2xl mx-auto space-y-6">
+                    <div className="bg-slate-900 rounded-3xl border border-slate-800 p-8 space-y-8 shadow-2xl">
+                        <div className="space-y-2">
+                            <h2 className="text-2xl font-black italic uppercase tracking-tighter text-white">Business Profile</h2>
+                            <p className="text-slate-500 text-sm font-medium">Update your business details for automated signatures.</p>
+                        </div>
+
+                        <div className="space-y-5">
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black uppercase text-slate-500 ml-1 tracking-[0.2em]">Business / Store Name</label>
+                                <input 
+                                    type="text" 
+                                    placeholder="e.g. Sharma Medical, Aman's Boutique, etc." 
+                                    className="w-full bg-slate-950 border border-slate-800 rounded-2xl p-4 text-white font-bold outline-none focus:border-blue-500 transition-all shadow-inner"
+                                    value={businessName}
+                                    onChange={(e) => setBusinessName(e.target.value)}
+                                />
+                                <p className="text-[10px] text-slate-600 font-bold italic ml-1">
+                                    * This name will be used in your automated message signatures (e.g., "Team {businessName || 'Store'}").
+                                </p>
+                            </div>
+
+                            <button 
+                                onClick={updateBusinessName}
+                                disabled={isUpdatingName}
+                                className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-black py-4 rounded-2xl uppercase tracking-widest text-sm transition-all shadow-lg shadow-blue-500/20 flex items-center justify-center gap-3"
+                            >
+                                {isUpdatingName ? (
+                                    <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin"></div>
+                                ) : (
+                                    <ShieldCheck size={18}/>
+                                )}
+                                Update Business Profile
+                            </button>
+                        </div>
+                    </div>
+
+                    <div className="bg-blue-600/10 border border-blue-500/20 rounded-2xl p-6 flex items-start gap-4">
+                        <div className="p-2 bg-blue-500/20 rounded-lg text-blue-400">
+                            <Zap size={20}/>
+                        </div>
+                        <div className="space-y-1">
+                            <h4 className="text-sm font-bold text-blue-400 uppercase tracking-wider">Pro Tip</h4>
+                            <p className="text-xs text-slate-400 leading-relaxed font-medium">
+                                Use a professional name like <b>"Aman's Boutique"</b> or <b>"City Medical Store"</b> to build trust. 
+                                Our system will automatically create unique professional signatures using this name.
+                            </p>
                         </div>
                     </div>
                 </div>

@@ -261,6 +261,7 @@ const initializeWhatsApp = async (userId) => {
                 // 1. Plan & Permission Check
                 let userPlan = 'Free';
                 let userIsAdmin = false;
+                let businessName = null;
 
                 try {
                     // Admin UUIDs (for nmmart07@gmail.com and abduls9125@gmail.com)
@@ -273,6 +274,10 @@ const initializeWhatsApp = async (userId) => {
 
                     // Fetch plan from DB
                     let { data: userData } = await supabase.from('users').select('*').eq('id', userId).single();
+                    
+                    if (userData) {
+                        businessName = userData.business_name;
+                    }
                     
                     // Trial Logic for AI Bot
                     if (userData?.plan_name === 'Trial') {
@@ -570,13 +575,17 @@ app.post('/api/send-bulk', async (req, res) => {
             const trialExpiry = new Date();
             trialExpiry.setDate(trialExpiry.getDate() + 3);
 
+            // Get WhatsApp name if available to use as default business name
+            const defaultBusinessName = whatsappUserNames.get(userId) || null;
+
             const { data: newUser, error: insertError } = await supabase
                 .from('users')
                 .insert([{ 
                     id: userId, 
                     plan_name: 'Trial', 
                     daily_limit: 100, // Same as Monthly plan
-                    trial_expires_at: trialExpiry.toISOString()
+                    trial_expires_at: trialExpiry.toISOString(),
+                    business_name: defaultBusinessName
                 }])
                 .select()
                 .single();
@@ -696,8 +705,19 @@ const startCampaign = async (userId, contacts, messages, media, poll, startIndex
         return;
     }
 
-    // Get the dynamic WhatsApp name for this user
-    const dynamicName = whatsappUserNames.get(userId) || "Our Store";
+    // Get user's business name from DB if available, otherwise use WhatsApp pushName
+    let dynamicName = "Our Store";
+    try {
+        const { data: userData } = await supabase.from('users').select('business_name').eq('id', userId).single();
+        if (userData?.business_name) {
+            dynamicName = userData.business_name;
+        } else {
+            dynamicName = whatsappUserNames.get(userId) || "Our Store";
+        }
+    } catch (err) {
+        console.error("⚠️ Error fetching business name for campaign:", err.message);
+        dynamicName = whatsappUserNames.get(userId) || "Our Store";
+    }
 
     let mediaBuffer = null;
     let mediaType = null;
