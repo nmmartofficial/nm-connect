@@ -354,7 +354,9 @@ app.post('/api/send-bulk', async (req, res) => {
     }
 
     const userEmail = userData?.email || '';
-    const isAdmin = userEmail === 'nmmart07@gmail.com' || userEmail === 'abduls9125@gmail.com'; // Your admin emails
+    // Normalize email to lowercase to avoid case-sensitivity issues
+    const normalizedEmail = userEmail.toLowerCase().trim();
+    const isAdmin = normalizedEmail === 'nmmart07@gmail.com' || normalizedEmail === 'abduls9125@gmail.com';
 
     let plan = userData?.plan_name || 'Free';
     let limit = userData?.daily_limit || 50;
@@ -363,7 +365,9 @@ app.post('/api/send-bulk', async (req, res) => {
     if (isAdmin) {
         plan = 'Enterprise';
         limit = 999999;
-        console.log(`👑 Admin Access: Everything unlocked for ${userEmail}`);
+        console.log(`👑 Admin Access Verified: Everything unlocked for ${normalizedEmail}`);
+    } else {
+        console.log(`👤 Regular User Access: ${normalizedEmail} (Plan: ${plan})`);
     }
 
     console.log(`📊 User Plan: ${plan}, Limit: ${limit}, Contacts: ${contacts.length}, Has Media: ${!!media}`);
