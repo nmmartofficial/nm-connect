@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 
-export default function SessionManager({ userId, socket, onStatusChange }) {
+export default function SessionManager({ userId, socket, backendUrl, onStatusChange }) {
   const [qrCode, setQrCode] = useState(null);
   const [status, setStatus] = useState('Checking Status...');
   const [loading, setLoading] = useState(true);
@@ -76,6 +76,33 @@ export default function SessionManager({ userId, socket, onStatusChange }) {
     socket.emit('request_session', userId);
   };
 
+  const handleResetEngine = async () => {
+    if (!window.confirm("Are you sure? This will logout WhatsApp and delete session data. You will need to scan QR again.")) return;
+    
+    setLoading(true);
+    setStatus('Resetting Engine...');
+    setQrCode(null);
+    
+    try {
+      const response = await fetch(`${backendUrl}/api/reset-session`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId })
+      });
+      
+      if (response.ok) {
+        alert("Engine Reset Successful! Initializing fresh session...");
+        socket.emit('request_session', userId);
+      } else {
+        alert("Failed to reset engine.");
+      }
+    } catch (err) {
+      alert("Error connecting to server.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="bg-slate-900/90 p-5 rounded-[2rem] border border-slate-800 mb-6 text-center shadow-2xl">
       <div className="flex justify-between items-center mb-4">
@@ -95,6 +122,12 @@ export default function SessionManager({ userId, socket, onStatusChange }) {
               <img src={qrCode} alt="WhatsApp QR" className="w-[160px] h-[160px]" />
             </div>
             <p className="mt-4 text-[10px] font-black text-blue-400 uppercase tracking-tighter">Scan with WhatsApp</p>
+            <button 
+                onClick={handleResetEngine}
+                className="mt-4 text-[9px] text-red-500/50 hover:text-red-500 font-bold uppercase transition-colors"
+            >
+                Reset & Try Again
+            </button>
           </div>
         ) : (
           <div className="py-4 px-6 bg-slate-950/50 rounded-2xl border border-slate-800/50">
@@ -102,12 +135,28 @@ export default function SessionManager({ userId, socket, onStatusChange }) {
               {status}
             </p>
             {!status.includes('✅') && (
-              <button 
-                onClick={handleManualReconnect}
-                className="mt-3 text-[10px] text-blue-500 hover:text-blue-400 font-bold uppercase underline"
-              >
-                Reconnect Now
-              </button>
+              <div className="flex flex-col gap-2 mt-3">
+                <button 
+                  onClick={handleManualReconnect}
+                  className="text-[10px] text-blue-500 hover:text-blue-400 font-bold uppercase underline"
+                >
+                  Reconnect Now
+                </button>
+                <button 
+                  onClick={handleResetEngine}
+                  className="text-[9px] text-slate-600 hover:text-red-500 font-bold uppercase"
+                >
+                  Reset Engine
+                </button>
+              </div>
+            )}
+            {status.includes('✅') && (
+                <button 
+                    onClick={handleResetEngine}
+                    className="mt-4 text-[9px] text-slate-700 hover:text-red-500 font-bold uppercase"
+                >
+                    Logout / Reset
+                </button>
             )}
           </div>
         )}

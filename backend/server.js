@@ -261,6 +261,33 @@ app.post('/api/stop-campaign', (req, res) => {
     res.status(400).json({ error: "No active campaign to stop" });
 });
 
+app.post('/api/reset-session', async (req, res) => {
+    const { userId } = req.body;
+    console.log(`🧹 Resetting session for user: ${userId}`);
+    
+    try {
+        if (whatsappClient) {
+            whatsappClient.ev.removeAllListeners();
+            if (whatsappClient.ws) whatsappClient.ws.close();
+            whatsappClient = null;
+        }
+        
+        isInitializing = false;
+        lastQR = null;
+        
+        const authPath = join(__dirname, 'auth_info_baileys', userId);
+        if (fs.existsSync(authPath)) {
+            fs.rmSync(authPath, { recursive: true, force: true });
+            console.log(`✅ Deleted session folder: ${authPath}`);
+        }
+        
+        res.json({ status: "Session Reset Successful" });
+    } catch (err) {
+        console.error("❌ Reset Error:", err);
+        res.status(500).json({ error: "Failed to reset session" });
+    }
+});
+
 app.post('/api/send-bulk', async (req, res) => {
     const { contacts, messages, userId, media, startIndex = 0, campaignName = 'General Campaign', scheduledAt = null, campaignId = null } = req.body;
     

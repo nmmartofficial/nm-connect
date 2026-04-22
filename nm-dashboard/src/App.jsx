@@ -369,7 +369,12 @@ export default function App() {
             <button onClick={() => setIsMobileMenuOpen(false)} className="md:hidden text-slate-400"><X size={24}/></button>
         </div>
 
-        <SessionManager userId={USER_ID} socket={socket} onStatusChange={setIsWhatsAppReady} />
+        <SessionManager 
+          userId={USER_ID} 
+          socket={socket} 
+          backendUrl={BACKEND_URL}
+          onStatusChange={setIsWhatsAppReady} 
+        />
 
         <nav className="space-y-2 mt-8 flex-1">
           <button onClick={() => setActiveTab('dashboard')} className={`w-full flex items-center gap-3 p-3 rounded-xl font-bold transition-all ${activeTab === 'dashboard' ? 'bg-blue-600 text-white' : 'hover:bg-slate-800 text-slate-400'}`}>
