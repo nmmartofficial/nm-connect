@@ -762,29 +762,39 @@ const startCampaign = async (userId, contacts, messages, media, poll, startIndex
             if (contact.name) msg = msg.replace(/{name}/g, contact.name);
             msg = spinMessage(msg); 
 
-            const closings = [
-                `\n\n*Regards,*\n*Team NM Mart*`,
-                `\n\n*Thank you for choosing NM Mart!*`,
-                `\n\n_Have a wonderful day ahead!_\n*Team NM Mart*`,
-                `\n\n*Best Regards,*\n*Customer Success Team*\n*NM Mart*`,
-                `\n\n_We appreciate your business._\n*Regards, NM Mart*`,
-                `\n\n*Thank you!*\n_For any queries, feel free to reply._`,
-                `\n\n*Warm Regards,*\n*NM Mart Connect*`,
-                `\n\n_Stay connected with us for more updates._\n*Team NM Mart*`,
-                `\n\n*Thanks & Regards,*\n*NM Mart*`,
-                `\n\n*Sincerely,*\n*The NM Mart Team*`,
-                `\n\n_Wishing you a great day!_\n*Best, NM Mart*`,
-                `\n\n*With Regards,*\n*NM Mart Support*`,
-                `\n\n*Thank you for your trust.*\n*Team NM Mart*`,
-                `\n\n_Happy to help!_\n*Regards, NM Mart*`,
-                `\n\n*Best Wishes,*\n*NM Mart*`,
-                `\n\n_Looking forward to serving you again._\n*Team NM Mart*`,
-                `\n\n*Professional Regards,*\n*NM Mart*`,
-                `\n\n*Kindly reach out if you have questions.*\n*Regards, NM Mart*`,
-                `\n\n*Have a productive day!*\n*Team NM Mart*`,
-                `\n\n*Your satisfaction is our priority.*\n*Regards, NM Mart*`
+            // --- DYNAMIC PROFESSIONAL CLOSING GENERATOR ---
+            // Combining different parts to create 1000+ unique professional signatures
+            const salutations = ["Regards,", "Best Regards,", "Warm Regards,", "Thanks & Regards,", "Sincerely,", "With Regards,", "Best Wishes,", "Professional Regards,", "Yours Truly,", "Best,"];
+            const phrases = [
+                "Team NM Mart", 
+                "NM Mart Support Team", 
+                "Customer Success Team", 
+                "NM Mart Connect", 
+                "The NM Mart Team", 
+                "NM Mart Helpdesk", 
+                "NM Mart Operations", 
+                "Team NM Mart Official"
             ];
-            const closing = closings[Math.floor(Math.random() * closings.length)];
+            const notes = [
+                "Thank you for choosing NM Mart!",
+                "Have a wonderful day ahead!",
+                "We appreciate your business.",
+                "For any queries, feel free to reply.",
+                "Stay connected with us for updates.",
+                "Your satisfaction is our priority.",
+                "Looking forward to serving you again.",
+                "Wishing you a productive day!",
+                "Thank you for your trust.",
+                "Happy to help you always!",
+                "" // Empty option for variety
+            ];
+
+            const randomSalutation = salutations[Math.floor(Math.random() * salutations.length)];
+            const randomPhrase = phrases[Math.floor(Math.random() * phrases.length)];
+            const randomNote = notes[Math.floor(Math.random() * notes.length)];
+
+            // Create a unique combination
+            const closing = `\n\n${randomNote ? `_${randomNote}_\n` : ''}*${randomSalutation}*\n*${randomPhrase}*`;
             const finalMsg = `${msg}${closing}`;
 
             const presenceSequence = Math.random();
