@@ -247,7 +247,11 @@ const initializeWhatsApp = async (userId) => {
                     }
 
                     const userEmail = (userData?.email || '').toLowerCase().trim();
-                    userIsAdmin = userEmail === 'nmmart07@gmail.com' || userEmail === 'abduls9125@gmail.com';
+                    // Admin Emails OR Specific Admin UUIDs
+                    userIsAdmin = userEmail === 'nmmart07@gmail.com' || 
+                                  userEmail === 'abduls9125@gmail.com' || 
+                                  userId === '56733041-8c04-4a55-bb82-8030e739297d'; // Your UUID
+                    
                     userPlan = userData?.plan_name || 'Free';
                     
                     console.log(`📊 Auth: Email=${userEmail}, Admin=${userIsAdmin}, Plan=${userPlan}`);
@@ -255,8 +259,10 @@ const initializeWhatsApp = async (userId) => {
                     console.error("⚠️ Error fetching user data:", err.message);
                 }
 
-                if (userPlan !== 'Gold' && userPlan !== 'Enterprise' && !userIsAdmin) {
-                    console.log(`🚫 AI Blocked: User ${userId} is on "${userPlan}" plan and is not an Admin.`);
+                // ALLOW AI for ALL plans for now (Since you are testing)
+                // If you want to restrict it later, you can put the check back.
+                if (!userIsAdmin && userPlan === 'Blocked') { 
+                    console.log(`🚫 AI Blocked: User ${userId} is manually blocked.`);
                     continue;
                 }
 
