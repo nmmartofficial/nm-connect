@@ -409,7 +409,7 @@ app.post('/api/send-bulk', async (req, res) => {
 
         if (insertError) {
             console.error("❌ DB Insert Error:", insertError);
-            return res.status(500).json({ error: "Failed to create campaign" });
+            return res.status(500).json({ error: `Failed to create campaign: ${insertError.message || 'Database error'}` });
         }
         activeCampaignId = campaignRecord.id;
     } else {
