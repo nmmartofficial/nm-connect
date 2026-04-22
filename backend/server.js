@@ -21,12 +21,11 @@ const { GoogleGenerativeAI } = require("@google/generative-ai");
 const app = express();
 
 // Initialize Gemini
-const genAI = process.env.GEMINI_API_KEY ? new GoogleGenerativeAI(process.env.GEMINI_API_KEY) : null;
-// Use gemini-1.5-flash explicitly
-const aiModel = genAI ? genAI.getGenerativeModel({ model: "gemini-1.5-flash" }) : null;
+const apiKey = (process.env.GEMINI_API_KEY || "").trim();
+const genAI = apiKey ? new GoogleGenerativeAI(apiKey) : null;
 
-if (aiModel) {
-    console.log("✅ Gemini AI Bot is configured and ready to assist!");
+if (genAI) {
+    console.log("✅ Gemini AI Bot is configured and ready!");
 } else {
     console.warn("⚠️ GEMINI_API_KEY is missing. AI Auto-responder will not work.");
 }
@@ -303,17 +302,17 @@ const initializeWhatsApp = async (userId) => {
                         Language: Use the same language as the customer.`;
 
                         let aiReply = "";
-                        try {
-                            // Try Gemini 1.5 Flash first
-                            const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-                            const result = await model.generateContent(prompt);
-                            aiReply = result.response.text();
-                        } catch (err) {
-                            console.warn("⚠️ Gemini 1.5 Flash failed, retrying with Gemini Pro...");
-                            // Fallback to Gemini Pro (The most stable model)
-                            const fallbackModel = genAI.getGenerativeModel({ model: "gemini-pro" });
-                            const result = await fallbackModel.generateContent(prompt);
-                            aiReply = result.response.text();
+                        const modelsToTry = ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-1.0-pro"];
+                        
+                        for (const modelName of modelsToTry) {
+                            try {
+                                const model = genAI.getGenerativeModel({ model: modelName });
+                                const result = await model.generateContent(prompt);
+                                aiReply = result.response.text();
+                                if (aiReply) break;
+                            } catch (err) {
+                                console.warn(`⚠️ Model ${modelName} failed, trying next...`);
+                            }
                         }
 
                         if (aiReply) {
