@@ -333,7 +333,7 @@ app.post('/api/send-bulk', async (req, res) => {
     }
 
     const userEmail = userData?.email || '';
-    const isAdmin = userEmail === 'nmmartofficial@gmail.com'; // Your admin email
+    const isAdmin = userEmail === 'nmmartofficial@gmail.com' || userEmail === 'nmmart07@gmail.com'; // Your admin emails
 
     let plan = userData?.plan_name || 'Free';
     let limit = userData?.daily_limit || 50;
