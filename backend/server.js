@@ -219,11 +219,13 @@ const initializeWhatsApp = async (userId) => {
                 console.log(`📩 Received message from ${from}: ${incomingMsg}`);
 
                 // 1. Fetch user data to check plan
-                const { data: userData } = await supabase.from('users').select('plan_name').eq('id', userId).single();
+                const { data: userData } = await supabase.from('users').select('plan_name, email').eq('id', userId).single();
                 const plan = userData?.plan_name || 'Free';
+                const userEmail = (userData?.email || '').toLowerCase().trim();
+                const isAdmin = userEmail === 'nmmart07@gmail.com' || userEmail === 'abduls9125@gmail.com';
 
-                // Bot only works for Gold/Enterprise users
-                if (plan !== 'Gold' && plan !== 'Enterprise') {
+                // Bot only works for Gold/Enterprise users OR Admins
+                if (plan !== 'Gold' && plan !== 'Enterprise' && !isAdmin) {
                     continue;
                 }
 
