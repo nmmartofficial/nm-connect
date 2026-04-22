@@ -22,6 +22,7 @@ const app = express();
 
 // Initialize Gemini
 const apiKey = (process.env.GEMINI_API_KEY || "").trim();
+// Force 'v1' stable version to avoid 404 errors on v1beta
 const genAI = apiKey ? new GoogleGenerativeAI(apiKey) : null;
 
 if (genAI) {
@@ -320,7 +321,8 @@ const initializeWhatsApp = async (userId) => {
                         Language: Use the same language as the customer.`;
 
                         let aiReply = "";
-                        const modelsToTry = ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-pro", "gemini-1.0-pro"];
+                        // Standard stable model names for v1 API
+                        const modelsToTry = ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-1.0-pro"];
                         
                         // Safety settings to prevent empty responses due to filters
                         const safetySettings = [
@@ -332,11 +334,12 @@ const initializeWhatsApp = async (userId) => {
 
                         for (const modelName of modelsToTry) {
                             try {
-                                console.log(`🔄 Trying model: ${modelName}...`);
+                                console.log(`🔄 Trying model: ${modelName} (API v1)...`);
+                                // Using the stable v1 API path
                                 const model = genAI.getGenerativeModel({ 
                                     model: modelName,
                                     safetySettings 
-                                });
+                                }, { apiVersion: 'v1' });
                                 
                                 const result = await model.generateContent(prompt);
                                 const response = await result.response;
