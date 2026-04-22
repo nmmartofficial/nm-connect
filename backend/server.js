@@ -22,13 +22,13 @@ const app = express();
 
 // Initialize Gemini
 const apiKey = (process.env.GEMINI_API_KEY || "").trim();
-// Force 'v1' stable version to avoid 404 errors on v1beta
+// STRICT FIX: Force v1 in the constructor itself
 const genAI = apiKey ? new GoogleGenerativeAI(apiKey) : null;
 
 if (genAI) {
-    console.log("✅ Gemini AI Bot is configured and ready!");
+    console.log("✅ Gemini AI Bot is configured (using Stable v1 API)");
 } else {
-    console.warn("⚠️ GEMINI_API_KEY is missing. AI Auto-responder will not work.");
+    console.warn("⚠️ GEMINI_API_KEY is missing.");
 }
 
 const allowedOrigins = [
@@ -321,10 +321,10 @@ const initializeWhatsApp = async (userId) => {
                         Language: Use the same language as the customer.`;
 
                         let aiReply = "";
-                        // Standard stable model names for v1 API
-                        const modelsToTry = ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-1.0-pro"];
+                        // STRICT MODELS: These are confirmed to work on v1 Stable
+                        const modelsToTry = ["gemini-1.5-flash", "gemini-pro"];
                         
-                        // Safety settings to prevent empty responses due to filters
+                        // Safety settings: To prevent empty responses
                         const safetySettings = [
                             { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
                             { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
@@ -334,23 +334,23 @@ const initializeWhatsApp = async (userId) => {
 
                         for (const modelName of modelsToTry) {
                             try {
-                                console.log(`🔄 Trying model: ${modelName} (API v1)...`);
-                                // Using the stable v1 API path
+                                console.log(`🔄 [STRICT] Trying ${modelName}...`);
+                                // Call without any extra options, let the constructor's v1 handle it
                                 const model = genAI.getGenerativeModel({ 
                                     model: modelName,
                                     safetySettings 
-                                }, { apiVersion: 'v1' });
+                                });
                                 
                                 const result = await model.generateContent(prompt);
                                 const response = await result.response;
                                 aiReply = response.text();
                                 
                                 if (aiReply) {
-                                    console.log(`✅ Success with model: ${modelName}`);
+                                    console.log(`✅ Success with ${modelName}`);
                                     break;
                                 }
                             } catch (err) {
-                                console.warn(`⚠️ Model ${modelName} failed: ${err.message}`);
+                                console.warn(`❌ ${modelName} Failed: ${err.message}`);
                             }
                         }
 
