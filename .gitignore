@@ -4,5 +4,6 @@ node_modules/
 dist/
 backend/.wwebjs_auth/
 backend/.wwebjs_cache/
+backend/auth_info_baileys/
 nm-dashboard/dist/
 *.log

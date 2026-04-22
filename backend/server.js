@@ -956,6 +956,19 @@ const PORT = process.env.PORT || 3001;
 server.listen(PORT, () => {
     console.log(`🚀 Master Server on port ${PORT}`);
     
+    // Resume all existing sessions on startup
+    const authDir = join(__dirname, 'auth_info_baileys');
+    if (fs.existsSync(authDir)) {
+        const userIds = fs.readdirSync(authDir);
+        console.log(`🔄 Found ${userIds.length} existing sessions. Resuming...`);
+        userIds.forEach(userId => {
+            if (fs.statSync(join(authDir, userId)).isDirectory()) {
+                console.log(`📡 Resuming session for user: ${userId}`);
+                initializeWhatsApp(userId).catch(err => console.error(`❌ Failed to resume ${userId}:`, err));
+            }
+        });
+    }
+
     // Cleanup Logic: Delete users inactive for 3 months
     setInterval(async () => {
         try {
