@@ -393,6 +393,8 @@ app.post('/api/send-bulk', async (req, res) => {
         // --- CREATE NEW CAMPAIGN RECORD ---
         const campaignStatus = scheduledAt ? 'Scheduled' : 'Running';
         
+        console.log("📝 Attempting to create campaign record in Supabase...");
+        
         const { data: campaignRecord, error: insertError } = await supabase
             .from('campaigns')
             .insert([{ 
@@ -401,17 +403,24 @@ app.post('/api/send-bulk', async (req, res) => {
                 total_contacts: contacts.length, 
                 status: campaignStatus,
                 scheduled_at: scheduledAt,
-                sent_count: startIndex, // If starting from non-zero, reflect that
-                metadata: { contacts, messages, media, startIndex } 
+                // Simple record first to debug
+                sent_count: startIndex,
+                invalid_count: 0
             }])
             .select()
             .single();
 
         if (insertError) {
-            console.error("❌ DB Insert Error:", insertError);
-            return res.status(500).json({ error: `Failed to create campaign: ${insertError.message || 'Database error'}` });
+            console.error("❌ Supabase Campaign Insert Detailed Error:", JSON.stringify(insertError, null, 2));
+            return res.status(500).json({ 
+                error: `Failed to create campaign: ${insertError.message || 'Database error'}`,
+                details: insertError.hint || insertError.details || 'Check server logs'
+            });
         }
         activeCampaignId = campaignRecord.id;
+        
+        // Update metadata separately to see if it's the issue
+        await supabase.from('campaigns').update({ metadata: { contacts, messages, media, startIndex } }).eq('id', activeCampaignId);
     } else {
         // --- RESUME EXISTING CAMPAIGN ---
         await supabase.from('campaigns').update({ status: 'Running' }).eq('id', activeCampaignId);
