@@ -216,6 +216,17 @@ app.post('/api/stop-campaign', (req, res) => {
     if (runningCampaigns.has(userId)) {
         runningCampaigns.set(userId, false); // Mark it to stop
         console.log(`🛑 Stopping campaign for user: ${userId}`);
+
+        // Update Supabase status immediately
+        supabase
+            .from('campaigns')
+            .update({ status: 'Stopped' })
+            .eq('user_id', userId)
+            .eq('status', 'Running')
+            .then(() => {
+                console.log(`✅ Campaign marked as Stopped in DB for user: ${userId}`);
+            });
+
         return res.json({ status: "Stopping campaign..." });
     }
     res.status(400).json({ error: "No active campaign to stop" });
@@ -223,6 +234,25 @@ app.post('/api/stop-campaign', (req, res) => {
 
 app.post('/api/send-bulk', async (req, res) => {
     const { contacts, messages, userId, media, startIndex = 0, campaignName = 'General Campaign', scheduledAt = null } = req.body;
+    
+    // --- CHECK IF ALREADY RUNNING ---
+    if (!scheduledAt) {
+        const { data: existingCampaign } = await supabase
+            .from('campaigns')
+            .select('*')
+            .eq('user_id', userId)
+            .eq('status', 'Running')
+            .single();
+
+        if (existingCampaign) {
+            console.log(`⚠️ Campaign already running for user ${userId}: ${existingCampaign.name}`);
+            return res.status(400).json({ 
+                error: "A campaign is already running!", 
+                existingCampaign: existingCampaign.id,
+                msg: "Please stop the current campaign first or wait for it to complete."
+            });
+        }
+    }
     
     // --- PLAN CHECKING LOGIC ---
     const { data: userData } = await supabase.from('users').select('plan_name, daily_limit').eq('id', userId).single();
@@ -299,7 +329,13 @@ const startCampaign = async (userId, contacts, messages, media, startIndex, camp
         if (runningCampaigns.get(userId) === false) {
             console.log(`🛑 Campaign stopped by user ${userId} at index ${i}`);
             io.emit(`log_${userId}`, { type: 'info', msg: '🛑 Campaign stopped manually!' });
-            break;
+            
+            // Update DB status to Stopped
+            if (campaignId) {
+                await supabase.from('campaigns').update({ status: 'Stopped', sent_count: sentCount, invalid_count: invalidCount }).eq('id', campaignId);
+            }
+            runningCampaigns.delete(userId);
+            return; // Exit campaign
         }
 
         const contact = contacts[i];
@@ -319,115 +355,117 @@ const startCampaign = async (userId, contacts, messages, media, startIndex, camp
                 invalidCount++;
                 
                 io.emit(`log_${userId}`, {
-                      type: 'error', 
-                      msg: `Invalid Number Removed: ${contact.number}`,
-                      progress: { current: i + 1, total: contacts.length, sent: sentCount, invalid: invalidCount, lastIndex: i }
-                  });
-                  continue; // Skip to next contact
-               }
-
-                // --- THE CHAOS ENGINE ---
-                const offerCode = `NM${Math.floor(1000 + Math.random() * 9000)}`;
-                const closings = [
-                    `\n\n*Ref: ${offerCode}*`,
-                    `\n\n(Offer Code: ${offerCode})`,
-                    `\n\n[Reference: ${offerCode}]`,
-                    `\n\n_Ref No: ${offerCode}_`,
-                    `\n\n*Regards, NM Mart*`,
-                    `\n\n_Thank you for choosing NM Mart!_`
-                ];
-                const closing = closings[Math.floor(Math.random() * closings.length)];
-
-                const spinMessage = (text) => {
-                    return text.replace(/{([^{}]+)}/g, (match, options) => {
-                        const choices = options.split('|');
-                        return choices[Math.floor(Math.random() * choices.length)];
-                    });
-                };
-
-                let msg = messages[Math.floor(Math.random() * messages.length)];
-                if (contact.name) msg = msg.replace(/{name}/g, contact.name);
-                msg = spinMessage(msg); 
-
-                const finalMsg = `${msg}${closing}`;
-
-                // Simulate Human Behavior
-                await whatsappClient.sendPresenceUpdate('available', chatId);
-                io.emit(`log_${userId}`, { type: 'info', msg: `📖 Checking chat with ${contact.number}...` });
-                
-                await new Promise(r => setTimeout(r, Math.random() * 2000 + 500)); 
-                
-                await whatsappClient.sendPresenceUpdate('composing', chatId);
-                const typingTime = Math.min(finalMsg.length * (Math.random() * 25 + 15), 5000); 
-                io.emit(`log_${userId}`, { type: 'info', msg: `✍️ Typing personalized offer...` });
-                await new Promise(r => setTimeout(r, typingTime));
-
-                await new Promise(r => setTimeout(r, Math.random() * 1500 + 500));
-
-                if (mediaBuffer) {
-                    const sendMsg = {};
-                    sendMsg[mediaType] = mediaBuffer;
-                    sendMsg.caption = finalMsg;
-                    if (mediaType === 'document') sendMsg.fileName = media.filename || 'document';
-                    
-                    await whatsappClient.sendMessage(chatId, sendMsg);
-                } else {
-                    await whatsappClient.sendMessage(chatId, { text: finalMsg });
-                }
-
-                sentCount++;
-                console.log(`✅ Message sent to ${cleanNumber}`);
-
-                await supabase.from('customers').update({ status: 'Sent' }).eq('id', contact.id);
-                
-                if (campaignId) {
-                    await supabase.from('campaigns').update({ sent_count: sentCount, invalid_count: invalidCount }).eq('id', campaignId);
-                }
-
-                io.emit(`log_${userId}`, { 
-                    type: 'success', 
-                    msg: `Sent to ${contact.number}`,
+                    type: 'error', 
+                    msg: `Invalid Number Removed: ${contact.number}`,
                     progress: { current: i + 1, total: contacts.length, sent: sentCount, invalid: invalidCount, lastIndex: i }
                 });
+                continue; // Skip to next contact
+            }
 
-                let delay;
-                const chaosChance = Math.random();
+            // --- THE CHAOS ENGINE ---
+            const offerCode = `NM${Math.floor(1000 + Math.random() * 9000)}`;
+            const closings = [
+                `\n\n*Ref: ${offerCode}*`,
+                `\n\n(Offer Code: ${offerCode})`,
+                `\n\n[Reference: ${offerCode}]`,
+                `\n\n_Ref No: ${offerCode}_`,
+                `\n\n*Regards, NM Mart*`,
+                `\n\n_Thank you for choosing NM Mart!_`
+            ];
+            const closing = closings[Math.floor(Math.random() * closings.length)];
 
-                if (chaosChance < 0.05 && sentCount > 10) { 
-                    const deepMinutes = Math.floor(Math.random() * (25 - 12 + 1)) + 12;
-                    delay = deepMinutes * 60 * 1000;
-                    console.log(`🛌 Deep Distraction: Going offline for ${deepMinutes} mins...`);
-                    io.emit(`log_${userId}`, { type: 'info', msg: `🛌 Offline break for ${deepMinutes} mins...` });
-                    await whatsappClient.sendPresenceUpdate('unavailable', chatId);
-                } else if (chaosChance < 0.15 && sentCount > 5) {
-                    const quickMinutes = Math.floor(Math.random() * (5 - 2 + 1)) + 2;
-                    delay = quickMinutes * 60 * 1000;
-                    console.log(`📱 Quick Check: Waiting ${quickMinutes} mins...`);
-                    io.emit(`log_${userId}`, { type: 'info', msg: `📱 Random phone check for ${quickMinutes} mins...` });
-                } else {
-                    delay = Math.floor(Math.random() * (55000 - 20000 + 1)) + 20000;
-                    console.log(`⏳ Waiting ${delay/1000}s for next message...`);
-                }
+            const spinMessage = (text) => {
+                return text.replace(/{([^{}]+)}/g, (match, options) => {
+                    const choices = options.split('|');
+                    return choices[Math.floor(Math.random() * choices.length)];
+                });
+            };
 
-                await new Promise(r => setTimeout(r, delay));
+            let msg = messages[Math.floor(Math.random() * messages.length)];
+            if (contact.name) msg = msg.replace(/{name}/g, contact.name);
+            msg = spinMessage(msg); 
+
+            const finalMsg = `${msg}${closing}`;
+
+            // Simulate Human Behavior
+            await whatsappClient.sendPresenceUpdate('available', chatId);
+            io.emit(`log_${userId}`, { type: 'info', msg: `📖 Checking chat with ${contact.number}...` });
+            
+            await new Promise(r => setTimeout(r, Math.random() * 2000 + 500)); 
+            
+            await whatsappClient.sendPresenceUpdate('composing', chatId);
+            const typingTime = Math.min(finalMsg.length * (Math.random() * 25 + 15), 5000); 
+            io.emit(`log_${userId}`, { type: 'info', msg: `✍️ Typing personalized offer...` });
+            await new Promise(r => setTimeout(r, typingTime));
+
+            await new Promise(r => setTimeout(r, Math.random() * 1500 + 500));
+
+            if (mediaBuffer) {
+                const sendMsg = {};
+                sendMsg[mediaType] = mediaBuffer;
+                sendMsg.caption = finalMsg;
+                if (mediaType === 'document') sendMsg.fileName = media.filename || 'document';
+                
+                await whatsappClient.sendMessage(chatId, sendMsg);
+            } else {
+                await whatsappClient.sendMessage(chatId, { text: finalMsg });
+            }
+
+            sentCount++;
+            console.log(`✅ Message sent to ${cleanNumber}`);
+
+            await supabase.from('customers').update({ status: 'Sent' }).eq('id', contact.id);
+            
+            if (campaignId) {
+                await supabase.from('campaigns').update({ sent_count: sentCount, invalid_count: invalidCount }).eq('id', campaignId);
+            }
+
+            io.emit(`log_${userId}`, { 
+                type: 'success', 
+                msg: `Sent to ${contact.number}`,
+                progress: { current: i + 1, total: contacts.length, sent: sentCount, invalid: invalidCount, lastIndex: i }
+            });
+
+            let delay;
+            const chaosChance = Math.random();
+
+            if (chaosChance < 0.05 && sentCount > 10) { 
+                const deepMinutes = Math.floor(Math.random() * (25 - 12 + 1)) + 12;
+                delay = deepMinutes * 60 * 1000;
+                console.log(`🛌 Deep Distraction: Going offline for ${deepMinutes} mins...`);
+                io.emit(`log_${userId}`, { type: 'info', msg: `🛌 Offline break for ${deepMinutes} mins...` });
+                await whatsappClient.sendPresenceUpdate('unavailable', chatId);
+            } else if (chaosChance < 0.15 && sentCount > 5) {
+                const quickMinutes = Math.floor(Math.random() * (5 - 2 + 1)) + 2;
+                delay = quickMinutes * 60 * 1000;
+                console.log(`📱 Quick Check: Waiting ${quickMinutes} mins...`);
+                io.emit(`log_${userId}`, { type: 'info', msg: `📱 Random phone check for ${quickMinutes} mins...` });
+            } else {
+                delay = Math.floor(Math.random() * (55000 - 20000 + 1)) + 20000;
+                console.log(`⏳ Waiting ${delay/1000}s for next message...`);
+            }
+
+            await new Promise(r => setTimeout(r, delay));
    
-           } catch (err) {
-               console.error(`❌ Failed to send to ${contact.number}:`, err.message);
-               io.emit(`log_${userId}`, { 
-                   type: 'error', 
-                   msg: `Failed: ${contact.number}`,
-                   progress: { current: i + 1, total: contacts.length, sent: sentCount, invalid: invalidCount, lastIndex: i }
-               });
-           }
-       }
-       console.log("🏁 Campaign finished");
-       runningCampaigns.delete(userId);
- 
-       if (campaignId) {
-           await supabase.from('campaigns').update({ status: 'Completed', sent_count: sentCount, invalid_count: invalidCount }).eq('id', campaignId);
-       }
- 
-       io.emit(`log_${userId}`, { type: 'info', msg: '🏁 Campaign finished!' });
+        } catch (err) {
+            console.error(`❌ Failed to send to ${contact.number}:`, err.message);
+            io.emit(`log_${userId}`, { 
+                type: 'error', 
+                msg: `Failed: ${contact.number}`,
+                progress: { current: i + 1, total: contacts.length, sent: sentCount, invalid: invalidCount, lastIndex: i }
+            });
+        }
+    }
+
+    // Final cleanup - delete from runningCampaigns
+    console.log("🏁 Campaign finished");
+    runningCampaigns.delete(userId);
+
+    if (campaignId) {
+        await supabase.from('campaigns').update({ status: 'Completed', sent_count: sentCount, invalid_count: invalidCount }).eq('id', campaignId);
+    }
+
+    io.emit(`log_${userId}`, { type: 'info', msg: '🏁 Campaign finished!' });
 };
 
 // --- CAMPAIGN SCHEDULER RUNNER (Every Minute) ---
