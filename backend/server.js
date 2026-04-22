@@ -34,6 +34,7 @@ if (genAI) {
 const allowedOrigins = [
     "http://localhost:5173",
     "http://localhost:3000",
+    "https://nm-connect-b5aa.vercel.app",
     "https://nm-connect-b5aa-git-master-nmmart.vercel.app",
     "https://nm-connect.onrender.com"
 ];
