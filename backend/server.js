@@ -137,7 +137,6 @@ const initializeWhatsApp = async (userId) => {
 
         whatsappClient = makeWASocket({
             version,
-            printQRInTerminal: true, // Also print in terminal for debugging
             auth: {
                 creds: state.creds,
                 keys: makeCacheableSignalKeyStore(state.keys, pino({ level: 'silent' })),
