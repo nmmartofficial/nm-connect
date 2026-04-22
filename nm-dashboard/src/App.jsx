@@ -24,7 +24,10 @@ export default function App() {
   const [logs, setLogs] = useState([]);
   const [isWhatsAppReady, setIsWhatsAppReady] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [messageVariations, setMessageVariations] = useState({ A: '' });
+  const [messageVariations, setMessageVariations] = useState(() => {
+    const saved = localStorage.getItem('messageVariations');
+    return saved ? JSON.parse(saved) : { A: '', B: '', C: '' };
+  });
   const [selectedMedia, setSelectedMedia] = useState(null);
   const [scheduledTime, setScheduledTime] = useState('');
   const [campaignName, setCampaignName] = useState('');
@@ -236,7 +239,11 @@ export default function App() {
   }, [USER_ID, socket]);
 
   const handleMessageChange = (key, value) => {
-    setMessageVariations(prev => ({ ...prev, [key]: value }));
+    setMessageVariations(prev => {
+      const updated = { ...prev, [key]: value };
+      localStorage.setItem('messageVariations', JSON.stringify(updated));
+      return updated;
+    });
   };
 
   const [pollData, setPollData] = useState({ question: '', options: ['', ''] });
@@ -691,12 +698,27 @@ export default function App() {
 
                                     <div className="flex flex-col md:flex-row gap-3">
                                         {loading ? (
-                                            <button 
-                                                onClick={stopCampaign} 
-                                                className="flex-1 bg-red-600 hover:bg-red-700 text-white py-4 rounded-xl font-black uppercase tracking-widest transition-all shadow-lg shadow-red-500/20 flex items-center justify-center gap-2"
-                                            >
-                                                <XCircle size={20}/> Stop Campaign
-                                            </button>
+                                            <div className="flex-1 flex gap-2">
+                                              <button 
+                                                  onClick={stopCampaign} 
+                                                  className="flex-1 bg-red-600 hover:bg-red-700 text-white py-4 rounded-xl font-black uppercase tracking-widest transition-all shadow-lg shadow-red-500/20 flex items-center justify-center gap-2"
+                                              >
+                                                  <XCircle size={20}/> Stop
+                                              </button>
+                                              <button 
+                                                  onClick={async () => {
+                                                      if(window.confirm("Force reset will clear all stuck states. Use this if 'Stop' doesn't work.")) {
+                                                          await stopCampaign();
+                                                          setLoading(false);
+                                                          setActiveCampaignId(null);
+                                                      }
+                                                  }} 
+                                                  className="bg-slate-800 hover:bg-slate-700 text-slate-400 px-4 rounded-xl font-bold transition-all border border-slate-700"
+                                                  title="Force Reset"
+                                              >
+                                                  <RefreshCcw size={16}/>
+                                              </button>
+                                            </div>
                                         ) : (
                                             <>
                                                 <button 

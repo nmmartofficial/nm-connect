@@ -309,25 +309,24 @@ const handleSessionRequest = (userId, socket) => {
     }
 };
 
-app.post('/api/stop-campaign', (req, res) => {
+app.post('/api/stop-campaign', async (req, res) => {
     const { userId } = req.body;
-    if (runningCampaigns.has(userId)) {
-        runningCampaigns.set(userId, false); // Mark it to stop
-        console.log(`🛑 Stopping campaign for user: ${userId}`);
+    console.log(`🛑 Stopping campaign for user: ${userId}`);
 
-        // Update Supabase status immediately
-        supabase
-            .from('campaigns')
-            .update({ status: 'Stopped' })
-            .eq('user_id', userId)
-            .eq('status', 'Running')
-            .then(() => {
-                console.log(`✅ Campaign marked as Stopped in DB for user: ${userId}`);
-            });
+    // Stop memory loop
+    runningCampaigns.set(userId, false);
+    setTimeout(() => runningCampaigns.delete(userId), 5000);
 
-        return res.json({ status: "Stopping campaign..." });
-    }
-    res.status(400).json({ error: "No active campaign to stop" });
+    // Update DB
+    const { error } = await supabase
+        .from('campaigns')
+        .update({ status: 'Stopped' })
+        .eq('user_id', userId)
+        .eq('status', 'Running');
+
+    if (error) console.error("Error stopping in DB:", error);
+
+    res.json({ status: "Campaign stopped and state cleared" });
 });
 
 app.post('/api/reset-session', async (req, res) => {
@@ -370,12 +369,19 @@ app.post('/api/send-bulk', async (req, res) => {
             .single();
 
         if (existingCampaign) {
-            console.log(`⚠️ Campaign already running for user ${userId}: ${existingCampaign.name}`);
-            return res.status(400).json({ 
-                error: "A campaign is already running!", 
-                existingCampaign: existingCampaign.id,
-                msg: "Please stop the current campaign first or wait for it to complete."
-            });
+            // If it's running in memory, block.
+            if (runningCampaigns.get(userId) === true) {
+                console.log(`⚠️ Campaign already running for user ${userId}: ${existingCampaign.name}`);
+                return res.status(400).json({ 
+                    error: "A campaign is already running!", 
+                    existingCampaign: existingCampaign.id,
+                    msg: "Please stop the current campaign first or wait for it to complete."
+                });
+            } else {
+                // DB says running but memory doesn't (server restart). Clear it.
+                console.log("🧹 Found stuck campaign in DB (server restart), clearing...");
+                await supabase.from('campaigns').update({ status: 'Stopped' }).eq('id', existingCampaign.id);
+            }
         }
     }
     
