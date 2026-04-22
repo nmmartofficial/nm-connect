@@ -17,8 +17,12 @@ console.log("📍 API Backend URL in use:", BACKEND_URL);
 
 export default function App() {
   const [session, setSession] = useState(null);
-  const [activeTab, setActiveTab] = useState('dashboard');
+  const [activeTab, setActiveTab] = useState(() => localStorage.getItem('activeTab') || 'dashboard');
   const [customers, setCustomers] = useState([]);
+
+  useEffect(() => {
+    localStorage.setItem('activeTab', activeTab);
+  }, [activeTab]);
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [logs, setLogs] = useState([]);
@@ -54,6 +58,10 @@ export default function App() {
     if (!error) {
       setNewInventory({ product_name: '', mrp: '', sale_price: '', discount: '' });
       fetchInventory();
+      alert("Product added successfully!");
+    } else {
+      console.error("❌ Inventory Save Error:", error);
+      alert("Failed to save product: " + error.message);
     }
   };
 
