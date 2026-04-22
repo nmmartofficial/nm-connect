@@ -565,52 +565,33 @@ app.post('/api/send-bulk', async (req, res) => {
     let isAdmin = false;
     const normalizedBodyEmail = (bodyEmail || '').toLowerCase().trim();
     
-    // 1. Database Check (Now with 3-day Free Trial Logic)
+    // 1. Database Check (Lifetime Free 50 limit, No 3-day trial)
     try {
         let { data: userData, error: fetchError } = await supabase.from('users').select('*').eq('id', userId).single();
         
-        // If user doesn't exist in 'public.users', create them with a 3-day trial
+        // If user doesn't exist, create them as 'Free' with 50 limit
         if (!userData || fetchError) {
-            console.log(`🆕 New user detected: ${userId}. Assigning 3-day trial...`);
-            const trialExpiry = new Date();
-            trialExpiry.setDate(trialExpiry.getDate() + 3);
-
-            // Get WhatsApp name if available to use as default business name
-            const defaultBusinessName = whatsappUserNames.get(userId) || null;
-
+            console.log(`🆕 New user detected: ${userId}. Assigning Lifetime Free Plan...`);
+            
             const { data: newUser, error: insertError } = await supabase
                 .from('users')
                 .insert([{ 
                     id: userId, 
-                    plan_name: 'Trial', 
-                    daily_limit: 100, // Same as Monthly plan
-                    trial_expires_at: trialExpiry.toISOString(),
-                    business_name: defaultBusinessName
+                    plan_name: 'Free', 
+                    daily_limit: 50,
+                    last_active_at: new Date().toISOString()
                 }])
                 .select()
                 .single();
             
             if (!insertError) userData = newUser;
+        } else {
+            // Update last_active_at every time they use the system
+            await supabase.from('users').update({ last_active_at: new Date().toISOString() }).eq('id', userId);
         }
 
-        // Check if trial has expired
-        if (userData?.plan_name === 'Trial') {
-            const now = new Date();
-            const expiry = new Date(userData.trial_expires_at);
-            
-            if (now > expiry) {
-                console.log(`⏰ Trial expired for user ${userId}. Reverting to Free.`);
-                await supabase.from('users').update({ plan_name: 'Free', daily_limit: 50 }).eq('id', userId);
-                plan = 'Free';
-                limit = 50;
-            } else {
-                plan = 'Monthly'; // Treat Trial as Monthly plan features
-                limit = userData.daily_limit || 100;
-            }
-        } else {
-            plan = userData?.plan_name || 'Free';
-            limit = userData?.daily_limit || 50;
-        }
+        plan = userData?.plan_name || 'Free';
+        limit = userData?.daily_limit || 50;
 
         const dbEmail = (userData?.email || '').toLowerCase().trim();
         isAdmin = dbEmail === 'nmmart07@gmail.com' || dbEmail === 'abduls9125@gmail.com' || userId === '56733041-8c04-4a55-bb82-8030e739297d' || normalizedBodyEmail === 'nmmart07@gmail.com' || normalizedBodyEmail === 'abduls9125@gmail.com';
@@ -963,4 +944,32 @@ setInterval(async () => {
 }, 60000); // Check every 60 seconds
 
 const PORT = process.env.PORT || 3001;
-server.listen(PORT, () => console.log(`🚀 Master Server on port ${PORT}`));
+server.listen(PORT, () => {
+    console.log(`🚀 Master Server on port ${PORT}`);
+    
+    // Cleanup Logic: Delete users inactive for 3 months
+    setInterval(async () => {
+        try {
+            console.log("🧹 Running 3-month Inactivity Cleanup...");
+            const threeMonthsAgo = new Date();
+            threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+
+            const { data: inactiveUsers, error } = await supabase
+                .from('users')
+                .select('id')
+                .lt('last_active_at', threeMonthsAgo.toISOString())
+                .neq('plan_name', 'Monthly') // Don't delete paid users easily
+                .neq('plan_name', 'Yearly');
+
+            if (inactiveUsers && inactiveUsers.length > 0) {
+                const idsToDelete = inactiveUsers.map(u => u.id);
+                console.log(`🗑️ Deleting ${idsToDelete.length} inactive users...`);
+                
+                // Delete from users table (Auth cleanup needs to be manual or via trigger)
+                await supabase.from('users').delete().in('id', idsToDelete);
+            }
+        } catch (err) {
+            console.error("❌ Cleanup failed:", err.message);
+        }
+    }, 24 * 60 * 60 * 1000); // Run once every 24 hours
+});

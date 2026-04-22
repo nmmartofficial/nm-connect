@@ -41,21 +41,17 @@ export default function Login({ onLoginSuccess }) {
         if (error) throw error;
 
         if (data.user) {
-          // Manually create the user record in 'users' table if it doesn't exist
-          // (Though usually handled by a trigger, this ensures data is there for your plan logic)
-          const trialExpiry = new Date();
-          trialExpiry.setDate(trialExpiry.getDate() + 3);
-
+          // Create user as 'Free' (Lifetime 50 limit)
           await supabase.from('users').upsert({
             id: data.user.id,
             email: email.toLowerCase(),
             business_name: businessName,
-            plan_name: 'Trial',
-            daily_limit: 100,
-            trial_expires_at: trialExpiry.toISOString()
+            plan_name: 'Free',
+            daily_limit: 50,
+            last_active_at: new Date().toISOString()
           });
 
-          alert("Signup successful! You can now login.");
+          alert("Signup successful! You can now login with your 50 daily free messages.");
           setIsLogin(true);
         }
       }
@@ -164,7 +160,7 @@ export default function Login({ onLoginSuccess }) {
               disabled={loading}
               className="w-full bg-blue-600 hover:bg-blue-500 text-white font-black uppercase py-4 rounded-xl shadow-lg transition-all active:scale-95 text-xs tracking-widest"
             >
-              {loading ? "..." : (isLogin ? "Launch Dashboard" : "Register & Start Trial")}
+              {loading ? "..." : (isLogin ? "Launch Dashboard" : "Register & Get 50 Free Daily")}
             </button>
 
             <div className="text-center mt-4">
