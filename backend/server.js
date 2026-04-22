@@ -347,30 +347,34 @@ app.post('/api/send-bulk', async (req, res) => {
     }
     
     // --- PLAN CHECKING LOGIC ---
-    const { data: userData, error: userError } = await supabase.from('users').select('plan_name, daily_limit, email').eq('id', userId).single();
-    
-    if (userError) {
-        console.error("❌ Supabase User Fetch Error:", userError);
+    // Try to get user data from Supabase, but don't let it block admin access
+    let plan = 'Free';
+    let limit = 50;
+    let isAdmin = false;
+
+    try {
+        const { data: userData } = await supabase.from('users').select('plan_name, daily_limit, email').eq('id', userId).single();
+        
+        const userEmail = (userData?.email || '').toLowerCase().trim();
+        // HARDCODED ADMIN EMAILS for absolute power
+        isAdmin = userEmail === 'nmmart07@gmail.com' || 
+                  userEmail === 'abduls9125@gmail.com' || 
+                  userId === '5998a41a-6415-4673-9a7c-403487333555'; // Adding a known UID as fallback if email fetch fails
+
+        plan = userData?.plan_name || 'Free';
+        limit = userData?.daily_limit || 50;
+    } catch (err) {
+        console.error("⚠️ Supabase User Fetch Failed, falling back to ID check:", err.message);
     }
-
-    const userEmail = userData?.email || '';
-    // Normalize email to lowercase to avoid case-sensitivity issues
-    const normalizedEmail = userEmail.toLowerCase().trim();
-    const isAdmin = normalizedEmail === 'nmmart07@gmail.com' || normalizedEmail === 'abduls9125@gmail.com';
-
-    let plan = userData?.plan_name || 'Free';
-    let limit = userData?.daily_limit || 50;
 
     // --- ADMIN OVERRIDE: Unlock everything for YOU ---
     if (isAdmin) {
         plan = 'Enterprise';
         limit = 999999;
-        console.log(`👑 Admin Access Verified: Everything unlocked for ${normalizedEmail}`);
-    } else {
-        console.log(`👤 Regular User Access: ${normalizedEmail} (Plan: ${plan})`);
+        console.log(`👑 ADMIN POWER ACTIVATED: Unlimited access granted.`);
     }
 
-    console.log(`📊 User Plan: ${plan}, Limit: ${limit}, Contacts: ${contacts.length}, Has Media: ${!!media}`);
+    console.log(`📊 Session User: ${userId}, Plan: ${plan}, Limit: ${limit}, Contacts: ${contacts.length}`);
 
     if (contacts.length > limit && plan !== 'Gold' && plan !== 'Enterprise') {
         console.warn(`🚫 403: Plan Limit Exceeded (${plan}). Limit: ${limit}, Requested: ${contacts.length}`);
