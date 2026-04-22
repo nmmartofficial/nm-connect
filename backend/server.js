@@ -24,6 +24,12 @@ const app = express();
 const genAI = process.env.GEMINI_API_KEY ? new GoogleGenerativeAI(process.env.GEMINI_API_KEY) : null;
 const aiModel = genAI ? genAI.getGenerativeModel({ model: "gemini-1.5-flash" }) : null;
 
+if (aiModel) {
+    console.log("✅ Gemini AI Bot is configured and ready to assist!");
+} else {
+    console.warn("⚠️ GEMINI_API_KEY is missing. AI Auto-responder will not work.");
+}
+
 const allowedOrigins = [
     "http://localhost:5173",
     "http://localhost:3000",
