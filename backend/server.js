@@ -233,7 +233,7 @@ app.post('/api/stop-campaign', (req, res) => {
 });
 
 app.post('/api/send-bulk', async (req, res) => {
-    const { contacts, messages, userId, media, startIndex = 0, campaignName = 'General Campaign', scheduledAt = null } = req.body;
+    const { contacts, messages, userId, media, startIndex = 0, campaignName = 'General Campaign', scheduledAt = null, campaignId = null } = req.body;
     
     // --- CHECK IF ALREADY RUNNING ---
     if (!scheduledAt) {
@@ -268,40 +268,53 @@ app.post('/api/send-bulk', async (req, res) => {
         return res.status(403).json({ error: "Photo/Media sending is only available in Yearly plans (Silver/Gold). Please upgrade." });
     }
 
-    console.log(`📩 Bulk Send Request: user ${userId} (${plan}), ${contacts.length} contacts`);
+    console.log(`📩 Bulk Send Request: user ${userId} (${plan}), ${contacts.length} contacts, resume: ${!!campaignId}`);
     
     if (!whatsappClient) {
         console.error("❌ Bulk Send Failed: WhatsApp not connected");
         return res.status(400).json({ error: "WhatsApp not connected" });
     }
 
-    // --- CREATE CAMPAIGN RECORD (Reporting & Scheduling) ---
-    const campaignStatus = scheduledAt ? 'Scheduled' : 'Running';
-    
-    const { data: campaignRecord } = await supabase
-        .from('campaigns')
-        .insert([{ 
-            user_id: userId, 
-            name: campaignName, 
-            total_contacts: contacts.length, 
-            status: campaignStatus,
-            scheduled_at: scheduledAt,
-            // Store original request data for scheduled runs
-            metadata: { contacts, messages, media, startIndex } 
-        }])
-        .select()
-        .single();
+    let activeCampaignId = campaignId;
+
+    if (!activeCampaignId) {
+        // --- CREATE NEW CAMPAIGN RECORD ---
+        const campaignStatus = scheduledAt ? 'Scheduled' : 'Running';
+        
+        const { data: campaignRecord, error: insertError } = await supabase
+            .from('campaigns')
+            .insert([{ 
+                user_id: userId, 
+                name: campaignName, 
+                total_contacts: contacts.length, 
+                status: campaignStatus,
+                scheduled_at: scheduledAt,
+                sent_count: startIndex, // If starting from non-zero, reflect that
+                metadata: { contacts, messages, media, startIndex } 
+            }])
+            .select()
+            .single();
+
+        if (insertError) {
+            console.error("❌ DB Insert Error:", insertError);
+            return res.status(500).json({ error: "Failed to create campaign" });
+        }
+        activeCampaignId = campaignRecord.id;
+    } else {
+        // --- RESUME EXISTING CAMPAIGN ---
+        await supabase.from('campaigns').update({ status: 'Running' }).eq('id', activeCampaignId);
+    }
 
     if (scheduledAt) {
         console.log(`🕒 Campaign scheduled for ${scheduledAt}`);
-        return res.json({ status: "Campaign Scheduled", campaignId: campaignRecord?.id });
+        return res.json({ status: "Campaign Scheduled", campaignId: activeCampaignId });
     }
 
     // If not scheduled, start immediately
     runningCampaigns.set(userId, true);
-    res.json({ status: "Campaign Started", startIndex, campaignId: campaignRecord?.id });
+    res.json({ status: "Campaign Started", startIndex, campaignId: activeCampaignId });
 
-    startCampaign(userId, contacts, messages, media, startIndex, campaignRecord?.id);
+    startCampaign(userId, contacts, messages, media, startIndex, activeCampaignId);
 });
 
 // Extracted Campaign Logic for Reusability (Scheduling)
@@ -320,7 +333,7 @@ const startCampaign = async (userId, contacts, messages, media, startIndex, camp
         }
     }
 
-    let sentCount = 0;
+    let sentCount = startIndex;
     let invalidCount = 0;
     
     // Start from the provided index

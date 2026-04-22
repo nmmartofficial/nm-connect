@@ -40,9 +40,22 @@ export default function App() {
     return saved ? JSON.parse(saved) : { current: 0, total: 0, sent: 0, invalid: 0, lastIndex: -1 };
   });
 
+  const [activeCampaignId, setActiveCampaignId] = useState(() => {
+    return localStorage.getItem('activeCampaignId') || null;
+  });
+
+  // Persist progress to local storage
   useEffect(() => {
     localStorage.setItem('campaignProgress', JSON.stringify(campaignProgress));
   }, [campaignProgress]);
+
+  useEffect(() => {
+    if (activeCampaignId) {
+      localStorage.setItem('activeCampaignId', activeCampaignId);
+    } else {
+      localStorage.removeItem('activeCampaignId');
+    }
+  }, [activeCampaignId]);
 
   const socket = useMemo(() => io(BACKEND_URL, {
     transports: ['polling', 'websocket'],
@@ -182,6 +195,11 @@ export default function App() {
         setCampaignProgress(newLog.progress);
       }
 
+      if (newLog.msg && newLog.msg.includes('🏁 Campaign finished!')) {
+        setActiveCampaignId(null);
+        setCampaignProgress({ current: 0, total: 0, sent: 0, invalid: 0, lastIndex: -1 });
+      }
+
       setLogs(prev => [{ ...newLog, time: new Date().toLocaleTimeString() }, ...prev].slice(0, 50));
       if (newLog.type === 'success' || newLog.type === 'error') {
           fetchCustomers();
@@ -238,15 +256,22 @@ export default function App() {
           media: mediaData,
           startIndex: startIndex,
           scheduledAt: scheduledTime || null,
-          campaignName: campaignName || `Campaign ${new Date().toLocaleDateString()}`
+          campaignName: campaignName || `Campaign ${new Date().toLocaleDateString()}`,
+          campaignId: startIndex > 0 ? activeCampaignId : null
         })
       });
+      const result = await response.json();
       if (response.ok) {
+          if (result.campaignId) {
+            setActiveCampaignId(result.campaignId);
+          }
           const statusMsg = scheduledTime ? `Campaign scheduled for ${new Date(scheduledTime).toLocaleString()}...` : `Campaign started from index ${startIndex} (${targetList.length} contacts)...`;
           setLogs(prev => [{ type: 'info', msg: statusMsg, time: new Date().toLocaleTimeString() }, ...prev]);
           if (scheduledTime) setScheduledTime(''); // Reset after scheduling
           setCampaignName(''); // Reset
           fetchCampaignHistory();
+      } else {
+        alert(result.error || "Failed to start campaign");
       }
     } catch (err) {
       alert("Backend connection error!");
