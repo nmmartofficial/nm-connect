@@ -696,6 +696,9 @@ const startCampaign = async (userId, contacts, messages, media, poll, startIndex
         return;
     }
 
+    // Get the dynamic WhatsApp name for this user
+    const dynamicName = whatsappUserNames.get(userId) || "Our Store";
+
     let mediaBuffer = null;
     let mediaType = null;
     
@@ -771,20 +774,20 @@ const startCampaign = async (userId, contacts, messages, media, poll, startIndex
             ];
             
             const phrases = [
-                "Team NM Mart", 
-                "NM Mart Sales Team", 
+                `Team ${dynamicName}`, 
+                `${dynamicName} Sales Team`, 
                 "Customer Success Team", 
-                "NM Mart Support", 
-                "The NM Mart Team", 
-                "NM Mart Customer Care", 
-                "NM Mart Operations", 
-                "Team NM Mart Official",
-                "NM Mart Services",
-                "NM Mart Management"
+                `${dynamicName} Support`, 
+                `The ${dynamicName} Team`, 
+                `${dynamicName} Customer Care`, 
+                `${dynamicName} Operations`, 
+                `Team ${dynamicName} Official`,
+                `${dynamicName} Services`,
+                `${dynamicName} Management`
             ];
             
             const notes = [
-                "Thank you for choosing NM Mart!",
+                `Thank you for choosing ${dynamicName}!`,
                 "Have a wonderful day ahead!",
                 "We appreciate your business.",
                 "For any queries, feel free to reply.",
@@ -794,11 +797,11 @@ const startCampaign = async (userId, contacts, messages, media, poll, startIndex
                 "Wishing you a productive day!",
                 "Thank you for your trust.",
                 "Happy to help you always!",
-                "Best prices, always at NM Mart.",
-                "Quality products at best prices - NM Mart",
+                `Best prices, always at ${dynamicName}.`,
+                `Quality products at best prices - ${dynamicName}`,
                 "Visit us again for exciting offers.",
                 "We are here to serve you better.",
-                "NM Mart - Your trusted shopping partner.",
+                `${dynamicName} - Your trusted shopping partner.`,
                 "" // Variety
             ];
 
