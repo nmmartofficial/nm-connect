@@ -117,17 +117,18 @@ export default function SessionManager({ userId, socket, backendUrl, onStatusCha
         <div className={`h-1.5 w-1.5 rounded-full ${status.includes('✅') ? 'bg-green-500 shadow-[0_0_5px_rgba(34,197,94,0.6)]' : 'bg-orange-500 animate-pulse'}`}></div>
       </div>
 
-      <div className="flex flex-col items-center justify-center min-h-[100px]">
+      <div className="flex flex-col items-center justify-center min-h-[140px]">
         {loading && !qrCode ? (
           <div className="flex flex-col items-center gap-2">
             <div className="w-6 h-6 border-2 border-blue-500/10 border-t-blue-500 rounded-full animate-spin"></div>
             <p className="text-[9px] text-slate-500 font-bold uppercase">{status}</p>
           </div>
         ) : qrCode ? (
-          <div className="animate-in fade-in zoom-in duration-500">
-            <div className="bg-white p-2 rounded-xl shadow-2xl">
-              <img src={qrCode} alt="WhatsApp QR" className="w-[110px] h-[110px]" />
+          <div className="animate-in fade-in zoom-in duration-500 w-full flex flex-col items-center">
+            <div className="bg-white p-2.5 rounded-xl shadow-2xl ring-4 ring-slate-950">
+              <img src={qrCode} alt="WhatsApp QR" className="w-[180px] h-[180px] md:w-[200px] md:h-[200px]" />
             </div>
+            <p className="mt-3 text-[10px] font-black text-blue-400 uppercase tracking-widest">Scan QR Now</p>
             <button 
                 onClick={handleResetEngine}
                 className="mt-2 text-[8px] text-red-500/50 hover:text-red-500 font-bold uppercase transition-colors"
