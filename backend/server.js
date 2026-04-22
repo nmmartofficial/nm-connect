@@ -538,18 +538,6 @@ const startCampaign = async (userId, contacts, messages, media, poll, startIndex
                 continue; // Skip to next contact
             }
 
-            // --- THE CHAOS ENGINE ---
-            const offerCode = `NM${Math.floor(1000 + Math.random() * 9000)}`;
-            const closings = [
-                `\n\n*Ref: ${offerCode}*`,
-                `\n\n(Offer Code: ${offerCode})`,
-                `\n\n[Reference: ${offerCode}]`,
-                `\n\n_Ref No: ${offerCode}_`,
-                `\n\n*Regards, NM Mart*`,
-                `\n\n_Thank you for choosing NM Mart!_`
-            ];
-            const closing = closings[Math.floor(Math.random() * closings.length)];
-
             // --- THE GHOST-HUMAN ENGINE (TOTAL RANDOMIZATION) ---
             const spinMessage = (text) => {
                 return text.replace(/{([^{}]+)}/g, (match, options) => {
