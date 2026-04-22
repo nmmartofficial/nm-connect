@@ -612,6 +612,18 @@ export default function App() {
           <button onClick={() => setActiveTab('settings')} className={`w-full flex items-center gap-3 p-3 rounded-xl font-bold transition-all ${activeTab === 'settings' ? 'bg-blue-600 text-white' : 'hover:bg-slate-800 text-slate-400'}`}>
             <Settings size={18}/> Profile Settings
           </button>
+
+          <div className="pt-4 mt-4 border-t border-slate-800">
+            <button 
+                onClick={() => {
+                  supabase.auth.signOut();
+                  setSession(null);
+                }} 
+                className="w-full flex items-center gap-3 p-3 rounded-xl font-bold text-red-400 hover:bg-red-500/10 transition-all"
+            >
+                <LogOut size={18}/> Logout
+            </button>
+          </div>
         </nav>
 
         <div className="pt-6 border-t border-slate-800">

@@ -439,6 +439,15 @@ const initializeWhatsApp = async (userId) => {
                         }
                     } catch (aiErr) {
                         console.error(`❌ Final AI Error:`, aiErr.message);
+                        
+                        // Fallback: If AI fails, try to send a polite "I'm thinking" or keyword-only response
+                        try {
+                            const fallbackMsg = "Thank you for your message! Our AI assistant is currently busy, but our team will get back to you shortly.";
+                            await client.sendMessage(from, { text: fallbackMsg });
+                        } catch (fallbackErr) {
+                            console.error("❌ Fallback message failed:", fallbackErr.message);
+                        }
+                        
                         io.emit(`log_${userId}`, { type: 'error', msg: `❌ AI Error: ${aiErr.message}` });
                     }
                 }
