@@ -135,7 +135,16 @@ export default function App() {
   };
 
   const fetchUserPlan = async () => {
-    if (!USER_ID) return;
+    if (!USER_ID || !session?.user?.email) return;
+    
+    const userEmail = session.user.email.toLowerCase().trim();
+    const isAdmin = userEmail === 'nmmart07@gmail.com' || userEmail === 'abduls9125@gmail.com';
+
+    if (isAdmin) {
+      setUserPlan({ name: 'Enterprise', limit: 999999 });
+      return;
+    }
+
     const { data, error } = await supabase
       .from('users')
       .select('plan_name, daily_limit')
