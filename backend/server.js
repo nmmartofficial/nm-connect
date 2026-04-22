@@ -729,18 +729,18 @@ const startCampaign = async (userId, contacts, messages, media, poll, startIndex
     let nextBigBreakAt = Math.floor(Math.random() * 25) + 15; 
     
     // Start from the provided index
-    for (let i = startIndex; i < contacts.length; i++) {
-        // Check if user clicked STOP
-        if (runningCampaigns.get(userId) === false) {
-            console.log(`🛑 Campaign stopped by user ${userId} at index ${i}`);
-            io.emit(`log_${userId}`, { type: 'info', msg: '🛑 Campaign stopped manually!' });
-            
-            if (campaignId) {
-                await supabase.from('campaigns').update({ status: 'Stopped', sent_count: sentCount, invalid_count: invalidCount }).eq('id', campaignId);
-            }
-            runningCampaigns.delete(userId);
-            return; 
-        }
+            for (let i = startIndex; i < contacts.length; i++) {
+                // Check if user clicked STOP (CRITICAL FIX: Check at the very beginning of the loop)
+                if (runningCampaigns.get(userId) === false) {
+                    console.log(`🛑 [STOP DETECTED] Campaign loop terminated for user ${userId} at index ${i}`);
+                    io.emit(`log_${userId}`, { type: 'info', msg: '🛑 Campaign stopped manually!' });
+                    
+                    if (campaignId) {
+                        await supabase.from('campaigns').update({ status: 'Stopped', sent_count: sentCount, invalid_count: invalidCount }).eq('id', campaignId);
+                    }
+                    runningCampaigns.delete(userId);
+                    return; 
+                }
 
         const contact = contacts[i];
         try {
@@ -904,7 +904,19 @@ const startCampaign = async (userId, contacts, messages, media, poll, startIndex
             }
 
             console.log(`⏳ Next message in ${Math.round((delay + postSendThink)/1000)}s...`);
-            await new Promise(r => setTimeout(r, delay));
+            
+            // BREAKABLE DELAY: Check for STOP every 500ms during the long delay
+            const totalDelay = delay;
+            const checkInterval = 500;
+            let elapsed = 0;
+            while (elapsed < totalDelay) {
+                if (runningCampaigns.get(userId) === false) {
+                    console.log(`🛑 [STOP DURING DELAY] Stopping for user ${userId}`);
+                    return; // The main loop's start-of-loop check will also catch this, but returning here is faster
+                }
+                await new Promise(r => setTimeout(r, Math.min(checkInterval, totalDelay - elapsed)));
+                elapsed += checkInterval;
+            }
    
         } catch (err) {
             console.error(`❌ Failed to send to ${contact.number}:`, err.message);
