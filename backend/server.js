@@ -762,17 +762,16 @@ const startCampaign = async (userId, contacts, messages, media, poll, startIndex
             if (contact.name) msg = msg.replace(/{name}/g, contact.name);
             msg = spinMessage(msg); 
 
-            const offerCode = `NM${Math.floor(1000 + Math.random() * 9000)}`;
             const closings = [
-                `\n\n*Ref: ${offerCode}*`,
-                `\n\n(Offer Code: ${offerCode})`,
-                `\n\n[Reference: ${offerCode}]`,
-                `\n\n_Ref No: ${offerCode}_`,
-                `\n\n*Regards, NM Mart*`,
-                `\n\n_Thank you for choosing NM Mart!_`,
-                `\n\nHave a great day!`,
-                `\n\n- Team NM Mart`,
-                `\n\nRef ID: #${Math.random().toString(36).substring(7).toUpperCase()}`
+                `\n\n*Regards,*\n*Team NM Mart*`,
+                `\n\n*Thank you for choosing NM Mart!*`,
+                `\n\n_Have a wonderful day ahead!_\n*Team NM Mart*`,
+                `\n\n*Best Regards,*\n*Customer Success Team*\n*NM Mart*`,
+                `\n\n_We appreciate your business._\n*Regards, NM Mart*`,
+                `\n\n*Thank you!*\n_For any queries, feel free to reply._`,
+                `\n\n*Warm Regards,*\n*NM Mart Connect*`,
+                `\n\n_Stay connected with us for more updates._\n*Team NM Mart*`,
+                `\n\n*Thanks & Regards,*\n*NM Mart*`
             ];
             const closing = closings[Math.floor(Math.random() * closings.length)];
             const finalMsg = `${msg}${closing}`;
