@@ -240,21 +240,20 @@ const initializeWhatsApp = async (userId) => {
 
                 try {
                     console.log(`🔍 Checking DB for User ID: ${userId}`);
-                    const { data: userData, error: dbError } = await supabase.from('users').select('plan_name, email').eq('id', userId).single();
+                    // Removed 'email' from select because it doesn't exist in users table
+                    const { data: userData, error: dbError } = await supabase.from('users').select('plan_name').eq('id', userId).single();
                     
                     if (dbError) {
                         console.error("❌ Supabase DB Error:", dbError.message);
                     }
 
-                    const userEmail = (userData?.email || '').toLowerCase().trim();
-                    // Admin Emails OR Specific Admin UUIDs
-                    userIsAdmin = userEmail === 'nmmart07@gmail.com' || 
-                                  userEmail === 'abduls9125@gmail.com' || 
-                                  userId === '56733041-8c04-4a55-bb82-8030e739297d'; // Your UUID
+                    // Since 'email' is not in the users table, we only use UUID for admin check
+                    userIsAdmin = userId === '56733041-8c04-4a55-bb82-8030e739297d' || 
+                                  userId === '5998a41a-6415-4673-9a7c-403487333555'; // Adding known admin IDs
                     
                     userPlan = userData?.plan_name || 'Free';
                     
-                    console.log(`📊 Auth: Email=${userEmail}, Admin=${userIsAdmin}, Plan=${userPlan}`);
+                    console.log(`📊 Auth: ID=${userId}, Admin=${userIsAdmin}, Plan=${userPlan}`);
                 } catch (err) {
                     console.error("⚠️ Error fetching user data:", err.message);
                 }
