@@ -30,8 +30,17 @@ const server = http.createServer(app);
 const io = new Server(server, {
     cors: {
         origin: "*",
-        methods: ["GET", "POST"]
-    }
+        methods: ["GET", "POST"],
+        allowedHeaders: ["my-custom-header"],
+        credentials: true
+    },
+    transports: ['polling', 'websocket']
+});
+
+// Middleware for logging requests (helps debug 403)
+app.use((req, res, next) => {
+    console.log(`📡 ${req.method} ${req.url} - Origin: ${req.headers.origin}`);
+    next();
 });
 
 // Supabase Setup
