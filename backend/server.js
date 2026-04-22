@@ -798,28 +798,22 @@ const startCampaign = async (userId, contacts, messages, media, poll, startIndex
                 progress: { current: i + 1, total: contacts.length, sent: sentCount, invalid: invalidCount, lastIndex: i }
             });
 
-            // E. --- CHAOTIC HUMAN SIMULATION (ZERO PATTERNS) ---
+            // E. --- USER DEFINED DELAY (20s to 60s) WITH SAFETY ---
             let delay;
             const luck = Math.random();
 
-            // 1. Random "Distraction" Break (8% chance - Someone called or opened another app)
-            if (luck < 0.08) {
-                delay = Math.floor(Math.random() * (180000 - 45000 + 1)) + 45000;
-                console.log(`☕ Human Distraction: ${Math.round(delay/1000)}s break...`);
+            // 1. Occasional "Human Distraction" (5% chance - very important for safety)
+            if (luck < 0.05) {
+                delay = Math.floor(Math.random() * (120000 - 60000 + 1)) + 60000; // 1 to 2 mins
+                console.log(`☕ Long Break: ${Math.round(delay/1000)}s...`);
             } 
-            // 2. Quick "Micro-Break" (15% chance - Just checking notification)
-            else if (luck < 0.23) {
-                delay = Math.floor(Math.random() * (40000 - 15000 + 1)) + 15000;
-                console.log(`⏱️ Micro-pause: ${Math.round(delay/1000)}s...`);
-            }
-            // 3. Normal Human Flow (77% chance)
+            // 2. Standard Flow (95% chance - as requested: 20s to 60s)
             else {
-                // Base delay between 8 to 22 seconds
-                delay = Math.floor(Math.random() * (22000 - 8000 + 1)) + 8000;
+                delay = Math.floor(Math.random() * (60000 - 20000 + 1)) + 20000;
             }
 
-            // D. Randomized "Post-Send" Thinking (Wait a bit after sending)
-            const postSendThink = Math.floor(Math.random() * 3000 + 500);
+            // D. Randomized "Post-Send" Thinking
+            const postSendThink = Math.floor(Math.random() * 2000 + 500);
             await new Promise(r => setTimeout(r, postSendThink));
 
             console.log(`⏳ Next message in ${Math.round((delay + postSendThink)/1000)}s...`);
