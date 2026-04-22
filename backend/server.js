@@ -18,9 +18,25 @@ const fs = require('fs');
 const { join } = require('path');
 
 const app = express();
+
+const allowedOrigins = [
+    "http://localhost:5173",
+    "http://localhost:3000",
+    "https://nm-connect-b5aa-git-master-nmmart.vercel.app",
+    "https://nm-connect.onrender.com"
+];
+
 // More permissive CORS for Render
 app.use(cors({
-    origin: "*",
+    origin: function (origin, callback) {
+        // allow requests with no origin (like mobile apps or curl requests)
+        if (!origin) return callback(null, true);
+        if (allowedOrigins.indexOf(origin) !== -1 || origin.includes("vercel.app")) {
+            return callback(null, true);
+        } else {
+            return callback(null, true); // Fallback to true but it will echo the origin
+        }
+    },
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization", "my-custom-header"],
     credentials: true
@@ -35,7 +51,13 @@ app.get('/', (req, res) => {
 const server = http.createServer(app);
 const io = new Server(server, {
     cors: {
-        origin: "*",
+        origin: (origin, callback) => {
+            if (!origin || allowedOrigins.indexOf(origin) !== -1 || origin.includes("vercel.app")) {
+                callback(null, true);
+            } else {
+                callback(null, true);
+            }
+        },
         methods: ["GET", "POST"],
         allowedHeaders: ["my-custom-header"],
         credentials: true
