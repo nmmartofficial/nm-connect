@@ -302,16 +302,34 @@ const initializeWhatsApp = async (userId) => {
                         Language: Use the same language as the customer.`;
 
                         let aiReply = "";
-                        const modelsToTry = ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-1.0-pro"];
+                        const modelsToTry = ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-pro", "gemini-1.0-pro"];
                         
+                        // Safety settings to prevent empty responses due to filters
+                        const safetySettings = [
+                            { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
+                            { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
+                            { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
+                            { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" },
+                        ];
+
                         for (const modelName of modelsToTry) {
                             try {
-                                const model = genAI.getGenerativeModel({ model: modelName });
+                                console.log(`🔄 Trying model: ${modelName}...`);
+                                const model = genAI.getGenerativeModel({ 
+                                    model: modelName,
+                                    safetySettings 
+                                });
+                                
                                 const result = await model.generateContent(prompt);
-                                aiReply = result.response.text();
-                                if (aiReply) break;
+                                const response = await result.response;
+                                aiReply = response.text();
+                                
+                                if (aiReply) {
+                                    console.log(`✅ Success with model: ${modelName}`);
+                                    break;
+                                }
                             } catch (err) {
-                                console.warn(`⚠️ Model ${modelName} failed, trying next...`);
+                                console.warn(`⚠️ Model ${modelName} failed: ${err.message}`);
                             }
                         }
 
