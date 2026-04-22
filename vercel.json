@@ -1,8 +1,9 @@
 {
   "version": 2,
-  "buildCommand": "cd nm-dashboard && npm install && npm run build",
+  "buildCommand": "npm run vercel-build",
   "outputDirectory": "nm-dashboard/dist",
   "framework": "vite",
+  "trailingSlash": false,
   "rewrites": [
     { "source": "/(.*)", "destination": "/index.html" }
   ]
