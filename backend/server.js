@@ -673,6 +673,8 @@ const startCampaign = async (userId, contacts, messages, media, poll, startIndex
 
     let sentCount = startIndex;
     let invalidCount = 0;
+    // Dynamic next break point (e.g., after 15-40 messages)
+    let nextBigBreakAt = Math.floor(Math.random() * 25) + 15; 
     
     // Start from the provided index
     for (let i = startIndex; i < contacts.length; i++) {
@@ -681,23 +683,20 @@ const startCampaign = async (userId, contacts, messages, media, poll, startIndex
             console.log(`🛑 Campaign stopped by user ${userId} at index ${i}`);
             io.emit(`log_${userId}`, { type: 'info', msg: '🛑 Campaign stopped manually!' });
             
-            // Update DB status to Stopped
             if (campaignId) {
                 await supabase.from('campaigns').update({ status: 'Stopped', sent_count: sentCount, invalid_count: invalidCount }).eq('id', campaignId);
             }
             runningCampaigns.delete(userId);
-            return; // Exit campaign
+            return; 
         }
 
         const contact = contacts[i];
         try {
             const cleanNumber = contact.number.toString().replace(/\D/g, '');
-            // Ensure number has country code, default to 91 if 10 digits
             const formattedNumber = cleanNumber.length === 10 ? `91${cleanNumber}` : cleanNumber;
-            const chatId = `${formattedNumber}@s.whatsapp.net`; // Baileys format
+            const chatId = `${formattedNumber}@s.whatsapp.net`; 
 
             console.log(`🔍 Checking registration for: ${chatId}`);
-            // 1. Check if number is registered on WhatsApp
             const [result] = await client.onWhatsApp(chatId);
             
             if (!result || !result.exists) {
@@ -710,10 +709,9 @@ const startCampaign = async (userId, contacts, messages, media, poll, startIndex
                     msg: `Invalid Number Removed: ${contact.number}`,
                     progress: { current: i + 1, total: contacts.length, sent: sentCount, invalid: invalidCount, lastIndex: i }
                 });
-                continue; // Skip to next contact
+                continue; 
             }
 
-            // --- THE GHOST-HUMAN ENGINE (TOTAL RANDOMIZATION) ---
             const spinMessage = (text) => {
                 return text.replace(/{([^{}]+)}/g, (match, options) => {
                     const choices = options.split('|');
@@ -725,7 +723,6 @@ const startCampaign = async (userId, contacts, messages, media, poll, startIndex
             if (contact.name) msg = msg.replace(/{name}/g, contact.name);
             msg = spinMessage(msg); 
 
-            // A. Randomize Professional Closings & Reference Codes
             const offerCode = `NM${Math.floor(1000 + Math.random() * 9000)}`;
             const closings = [
                 `\n\n*Ref: ${offerCode}*`,
@@ -741,7 +738,6 @@ const startCampaign = async (userId, contacts, messages, media, poll, startIndex
             const closing = closings[Math.floor(Math.random() * closings.length)];
             const finalMsg = `${msg}${closing}`;
 
-            // B. Randomized Presence Simulation (Don't always follow the same steps)
             const presenceSequence = Math.random();
             if (presenceSequence > 0.2) {
                 await client.sendPresenceUpdate('available', chatId);
@@ -750,14 +746,12 @@ const startCampaign = async (userId, contacts, messages, media, poll, startIndex
             
             if (presenceSequence > 0.4) {
                 await client.sendPresenceUpdate('composing', chatId);
-                // Randomized Typing Speed (Slow, Fast, Variable)
                 const typingMultiplier = Math.random() * 40 + 10; 
                 const typingTime = Math.min(finalMsg.length * typingMultiplier, 7000); 
                 io.emit(`log_${userId}`, { type: 'info', msg: `✍️ Typing...` });
                 await new Promise(r => setTimeout(r, typingTime));
             }
 
-            // C. Final random pause before "Clicking Send"
             await new Promise(r => setTimeout(r, Math.random() * 2000 + 200));
 
             if (mediaBuffer) {
@@ -767,7 +761,6 @@ const startCampaign = async (userId, contacts, messages, media, poll, startIndex
                 if (mediaType === 'document') sendMsg.fileName = media.filename || 'document';
                 await client.sendMessage(chatId, sendMsg);
             } else if (poll && poll.question && Math.random() > 0.5) {
-                // Send Poll occasionally (50% chance if it exists)
                 await client.sendMessage(chatId, {
                     poll: {
                         name: poll.question,
@@ -782,7 +775,6 @@ const startCampaign = async (userId, contacts, messages, media, poll, startIndex
             sentCount++;
             console.log(`✅ Message sent to ${cleanNumber}`);
 
-            // D. Randomize "Post-Send" Presence
             if (Math.random() < 0.3) {
                 await client.sendPresenceUpdate('unavailable', chatId);
             }
@@ -798,23 +790,33 @@ const startCampaign = async (userId, contacts, messages, media, poll, startIndex
                 progress: { current: i + 1, total: contacts.length, sent: sentCount, invalid: invalidCount, lastIndex: i }
             });
 
-            // E. --- USER DEFINED DELAY (20s to 60s) WITH SAFETY ---
-            let delay;
-            const luck = Math.random();
-
-            // 1. Occasional "Human Distraction" (5% chance - very important for safety)
-            if (luck < 0.05) {
-                delay = Math.floor(Math.random() * (120000 - 60000 + 1)) + 60000; // 1 to 2 mins
-                console.log(`☕ Long Break: ${Math.round(delay/1000)}s...`);
-            } 
-            // 2. Standard Flow (95% chance - as requested: 20s to 60s)
-            else {
-                delay = Math.floor(Math.random() * (60000 - 20000 + 1)) + 20000;
-            }
-
             // D. Randomized "Post-Send" Thinking
             const postSendThink = Math.floor(Math.random() * 2000 + 500);
             await new Promise(r => setTimeout(r, postSendThink));
+
+            // E. --- ADVANCED RANDOM BREAK LOGIC (ULTIMATE SAFETY) ---
+            let delay;
+            const luck = Math.random();
+            const sessionSent = sentCount - startIndex;
+
+            // 1. BIG BREAK: Randomly after a chunk of messages
+            if (sessionSent >= nextBigBreakAt) {
+                // Random Big Break between 5 and 15 minutes
+                delay = Math.floor(Math.random() * (900000 - 300000 + 1)) + 300000; 
+                console.log(`🛌 Big Human Break: ${Math.round(delay/60000)} minutes after ${sessionSent} messages...`);
+                
+                // Set next break point (e.g., after another 20-50 messages)
+                nextBigBreakAt += Math.floor(Math.random() * 30) + 20;
+            }
+            // 2. MEDIUM BREAK: 10% chance of a 2-4 minute break (Human distraction)
+            else if (luck < 0.10) {
+                delay = Math.floor(Math.random() * (240000 - 120000 + 1)) + 120000;
+                console.log(`☕ Human Distraction: ${Math.round(delay/1000)}s...`);
+            }
+            // 3. NORMAL FLOW: 20s to 60s (User defined)
+            else {
+                delay = Math.floor(Math.random() * (60000 - 20000 + 1)) + 20000;
+            }
 
             console.log(`⏳ Next message in ${Math.round((delay + postSendThink)/1000)}s...`);
             await new Promise(r => setTimeout(r, delay));
