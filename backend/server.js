@@ -221,11 +221,29 @@ const initializeWhatsApp = async (userId) => {
                 if (msg.key.fromMe) continue;
 
                 const from = msg.key.remoteJid;
-                const body = msg.message?.conversation || 
-                             msg.message?.extendedTextMessage?.text || 
-                             msg.message?.imageMessage?.caption ||
-                             msg.message?.videoMessage?.caption || "";
                 
+                // --- ROBUST MESSAGE BODY EXTRACTION ---
+                const getMessageBody = (m) => {
+                    if (!m) return "";
+                    // standard text
+                    if (m.conversation) return m.conversation;
+                    // extended text (links/replies)
+                    if (m.extendedTextMessage?.text) return m.extendedTextMessage.text;
+                    // image/video captions
+                    if (m.imageMessage?.caption) return m.imageMessage.caption;
+                    if (m.videoMessage?.caption) return m.videoMessage.caption;
+                    // edited messages
+                    if (m.protocolMessage?.editedMessage) return getMessageBody(m.protocolMessage.editedMessage);
+                    // view once
+                    if (m.viewOnceMessageV2?.message) return getMessageBody(m.viewOnceMessageV2.message);
+                    if (m.viewOnceMessage?.message) return getMessageBody(m.viewOnceMessage.message);
+                    // ephemeral
+                    if (m.ephemeralMessage?.message) return getMessageBody(m.ephemeralMessage.message);
+                    
+                    return "";
+                };
+
+                const body = getMessageBody(msg.message);
                 const incomingMsg = body.toLowerCase().trim();
                 console.log(`📩 [DEBUG] New message from ${from}: "${incomingMsg}"`);
 
