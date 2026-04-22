@@ -286,8 +286,8 @@ const initializeWhatsApp = async (userId) => {
 
                 // 3. AI Reply (Gemini)
                 if (!matched) {
-                    if (!aiModel) {
-                        console.error("❌ AI Error: aiModel is not initialized. Check GEMINI_API_KEY in Render env.");
+                    if (!genAI) {
+                        console.error("❌ AI Error: genAI is not initialized. Check GEMINI_API_KEY in Render env.");
                         continue;
                     }
 
@@ -302,8 +302,19 @@ const initializeWhatsApp = async (userId) => {
                         Task: Reply politely and keep it very short (max 2 sentences). 
                         Language: Use the same language as the customer.`;
 
-                        const result = await aiModel.generateContent(prompt);
-                        const aiReply = result.response.text();
+                        let aiReply = "";
+                        try {
+                            // Try Gemini 1.5 Flash first
+                            const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+                            const result = await model.generateContent(prompt);
+                            aiReply = result.response.text();
+                        } catch (err) {
+                            console.warn("⚠️ Gemini 1.5 Flash failed, retrying with Gemini Pro...");
+                            // Fallback to Gemini Pro (The most stable model)
+                            const fallbackModel = genAI.getGenerativeModel({ model: "gemini-pro" });
+                            const result = await fallbackModel.generateContent(prompt);
+                            aiReply = result.response.text();
+                        }
 
                         if (aiReply) {
                             await client.sendMessage(from, { text: aiReply });
@@ -313,7 +324,8 @@ const initializeWhatsApp = async (userId) => {
                             console.log("⚠️ Gemini returned an empty response.");
                         }
                     } catch (aiErr) {
-                        console.error(`❌ Gemini API Error:`, aiErr.message);
+                        console.error(`❌ Gemini API Final Error:`, aiErr.message);
+                        io.emit(`log_${userId}`, { type: 'error', msg: `❌ AI Error: ${aiErr.message}` });
                     }
                 }
             }
