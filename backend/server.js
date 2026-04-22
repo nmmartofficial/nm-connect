@@ -18,7 +18,13 @@ const fs = require('fs');
 const { join } = require('path');
 
 const app = express();
-app.use(cors());
+// More permissive CORS for Render
+app.use(cors({
+    origin: "*",
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization", "my-custom-header"],
+    credentials: true
+}));
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 

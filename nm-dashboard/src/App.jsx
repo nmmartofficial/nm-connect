@@ -235,6 +235,8 @@ export default function App() {
     if (targetList.length === 0) return alert("No numbers to send!");
     if (!messageVariations.A.trim()) return alert("Please enter a message!");
 
+    console.log(`🌐 Triggering campaign at: ${BACKEND_URL}/api/send-bulk`);
+
     try {
       setLoading(true);
       if (startIndex === 0) {
@@ -265,6 +267,8 @@ export default function App() {
         })
       });
       const result = await response.json();
+      console.log(`📡 Campaign Response status: ${response.status}`, result);
+      
       if (response.ok) {
           if (result.campaignId) {
             setActiveCampaignId(result.campaignId);
@@ -278,6 +282,7 @@ export default function App() {
         alert(result.error || "Failed to start campaign");
       }
     } catch (err) {
+      console.error(`❌ Campaign Error:`, err);
       alert("Backend connection error!");
     } finally {
       setLoading(false);

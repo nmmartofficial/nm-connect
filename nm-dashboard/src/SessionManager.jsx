@@ -83,6 +83,8 @@ export default function SessionManager({ userId, socket, backendUrl, onStatusCha
     setStatus('Resetting Engine...');
     setQrCode(null);
     
+    console.log(`🌐 Resetting engine at: ${backendUrl}/api/reset-session`);
+    
     try {
       const response = await fetch(`${backendUrl}/api/reset-session`, {
         method: 'POST',
@@ -90,14 +92,19 @@ export default function SessionManager({ userId, socket, backendUrl, onStatusCha
         body: JSON.stringify({ userId })
       });
       
+      console.log(`📡 Response status: ${response.status}`);
+      
       if (response.ok) {
         alert("Engine Reset Successful! Initializing fresh session...");
         socket.emit('request_session', userId);
       } else {
-        alert("Failed to reset engine.");
+        const errorText = await response.text();
+        console.error(`❌ Reset Error Response: ${errorText}`);
+        alert(`Failed to reset engine. Status: ${response.status}`);
       }
     } catch (err) {
-      alert("Error connecting to server.");
+      console.error(`❌ Fetch Exception:`, err);
+      alert(`Error connecting to server: ${err.message}`);
     } finally {
       setLoading(false);
     }
