@@ -326,16 +326,25 @@ app.post('/api/send-bulk', async (req, res) => {
     }
     
     // --- PLAN CHECKING LOGIC ---
-    const { data: userData } = await supabase.from('users').select('plan_name, daily_limit').eq('id', userId).single();
+    const { data: userData, error: userError } = await supabase.from('users').select('plan_name, daily_limit').eq('id', userId).single();
+    
+    if (userError) {
+        console.error("❌ Supabase User Fetch Error:", userError);
+    }
+
     const plan = userData?.plan_name || 'Free';
     const limit = userData?.daily_limit || 50;
 
+    console.log(`📊 User Plan: ${plan}, Limit: ${limit}, Contacts: ${contacts.length}, Has Media: ${!!media}`);
+
     if (contacts.length > limit && plan !== 'Gold' && plan !== 'Enterprise') {
+        console.warn(`🚫 403: Plan Limit Exceeded (${plan}). Limit: ${limit}, Requested: ${contacts.length}`);
         return res.status(403).json({ error: `Your ${plan} plan limit is ${limit} contacts. Please upgrade to Gold for unlimited messaging.` });
     }
 
     // --- MEDIA RESTRICTION LOGIC ---
-    if (media && plan === 'Monthly') {
+    if (media && (plan === 'Monthly' || plan === 'Free')) {
+        console.warn(`🚫 403: Media Restriction. Plan: ${plan}`);
         return res.status(403).json({ error: "Photo/Media sending is only available in Yearly plans (Silver/Gold). Please upgrade." });
     }
 

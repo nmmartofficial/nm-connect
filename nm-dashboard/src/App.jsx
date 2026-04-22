@@ -12,7 +12,7 @@ import SessionManager from './SessionManager';
 import Login from './components/Login';
 
 // --- LOCAL/PRODUCTION AUTO-DETECT ---
-const BACKEND_URL = window.location.hostname === 'localhost' ? "http://localhost:3001" : (import.meta.env.VITE_BACKEND_URL || "https://nm-connect-backend.onrender.com");
+const BACKEND_URL = window.location.hostname === 'localhost' ? "http://localhost:3001" : (import.meta.env.VITE_BACKEND_URL || "https://nm-connect.onrender.com");
 console.log("📍 API Backend URL in use:", BACKEND_URL);
 
 export default function App() {
