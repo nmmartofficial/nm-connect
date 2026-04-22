@@ -227,25 +227,36 @@ const initializeWhatsApp = async (userId) => {
                              msg.message?.videoMessage?.caption || "";
                 
                 const incomingMsg = body.toLowerCase().trim();
-                if (!incomingMsg) continue;
+                console.log(`📩 [DEBUG] New message from ${from}: "${incomingMsg}"`);
 
-                console.log(`📩 [${userId}] Received: ${incomingMsg} from ${from}`);
+                if (!incomingMsg) {
+                    console.log("ℹ️ Empty message body, skipping...");
+                    continue;
+                }
 
                 // 1. Plan & Permission Check
                 let userPlan = 'Free';
                 let userIsAdmin = false;
 
                 try {
-                    const { data: userData } = await supabase.from('users').select('plan_name, email').eq('id', userId).single();
+                    console.log(`🔍 Checking DB for User ID: ${userId}`);
+                    const { data: userData, error: dbError } = await supabase.from('users').select('plan_name, email').eq('id', userId).single();
+                    
+                    if (dbError) {
+                        console.error("❌ Supabase DB Error:", dbError.message);
+                    }
+
                     const userEmail = (userData?.email || '').toLowerCase().trim();
                     userIsAdmin = userEmail === 'nmmart07@gmail.com' || userEmail === 'abduls9125@gmail.com';
                     userPlan = userData?.plan_name || 'Free';
+                    
+                    console.log(`📊 Auth: Email=${userEmail}, Admin=${userIsAdmin}, Plan=${userPlan}`);
                 } catch (err) {
-                    console.error("⚠️ Supabase Fetch Error in Bot:", err.message);
+                    console.error("⚠️ Error fetching user data:", err.message);
                 }
 
                 if (userPlan !== 'Gold' && userPlan !== 'Enterprise' && !userIsAdmin) {
-                    console.log(`🚫 Bot skipped for ${userId}: No permission (Plan: ${userPlan})`);
+                    console.log(`🚫 AI Blocked: User ${userId} is on "${userPlan}" plan and is not an Admin.`);
                     continue;
                 }
 
@@ -261,7 +272,7 @@ const initializeWhatsApp = async (userId) => {
                     
                     if (matchedResponse) {
                         matched = true;
-                        console.log(`🤖 Keyword Match: ${matchedResponse.keyword}`);
+                        console.log(`🤖 Keyword Match Found: "${matchedResponse.keyword}"`);
                         await new Promise(r => setTimeout(r, Math.random() * 2000 + 1000));
                         await client.sendMessage(from, { text: matchedResponse.response });
                         io.emit(`log_${userId}`, { type: 'info', msg: `🤖 Bot: Replied to ${from.split('@')[0]} (Keyword: ${matchedResponse.keyword})` });
@@ -269,28 +280,35 @@ const initializeWhatsApp = async (userId) => {
                 }
 
                 // 3. AI Reply (Gemini)
-                if (!matched && aiModel) {
+                if (!matched) {
+                    if (!aiModel) {
+                        console.error("❌ AI Error: aiModel is not initialized. Check GEMINI_API_KEY in Render env.");
+                        continue;
+                    }
+
                     try {
                         const senderNumber = from.split('@')[0];
-                        console.log(`🧠 AI Bot [${userId}]: Thinking for ${senderNumber}...`);
+                        console.log(`🧠 AI Thinking for ${senderNumber}... (Input: "${body}")`);
                         
                         await client.sendPresenceUpdate('composing', from);
                         
                         const prompt = `You are NM Connect's AI Assistant. 
-                        Customer: "${body}". 
-                        Reply politely and keep it short (max 2 sentences). 
-                        Language: Same as customer.`;
+                        Customer says: "${body}". 
+                        Task: Reply politely and keep it very short (max 2 sentences). 
+                        Language: Use the same language as the customer.`;
 
                         const result = await aiModel.generateContent(prompt);
                         const aiReply = result.response.text();
 
                         if (aiReply) {
                             await client.sendMessage(from, { text: aiReply });
-                            console.log(`✅ AI Bot [${userId}]: Replied to ${senderNumber}`);
+                            console.log(`✅ AI Replied: "${aiReply.substring(0, 50)}..."`);
                             io.emit(`log_${userId}`, { type: 'info', msg: `🧠 AI Bot: Replied to ${senderNumber} via Gemini` });
+                        } else {
+                            console.log("⚠️ Gemini returned an empty response.");
                         }
                     } catch (aiErr) {
-                        console.error(`❌ AI Error for ${userId}:`, aiErr.message);
+                        console.error(`❌ Gemini API Error:`, aiErr.message);
                     }
                 }
             }
