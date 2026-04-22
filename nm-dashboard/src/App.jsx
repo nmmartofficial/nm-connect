@@ -270,6 +270,7 @@ export default function App() {
           contacts: targetList, 
           messages: [messageVariations.A], 
           userId: USER_ID,
+          userEmail: session?.user?.email, // Sending email for direct admin check
           media: mediaData,
           startIndex: startIndex,
           scheduledAt: scheduledTime || null,

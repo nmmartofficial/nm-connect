@@ -325,7 +325,7 @@ app.post('/api/reset-session', async (req, res) => {
 });
 
 app.post('/api/send-bulk', async (req, res) => {
-    const { contacts, messages, userId, media, startIndex = 0, campaignName = 'General Campaign', scheduledAt = null, campaignId = null } = req.body;
+    const { contacts, messages, userId, userEmail: bodyEmail, media, startIndex = 0, campaignName = 'General Campaign', scheduledAt = null, campaignId = null } = req.body;
     
     // --- CHECK IF ALREADY RUNNING ---
     if (!scheduledAt) {
@@ -347,34 +347,36 @@ app.post('/api/send-bulk', async (req, res) => {
     }
     
     // --- PLAN CHECKING LOGIC ---
-    // Try to get user data from Supabase, but don't let it block admin access
     let plan = 'Free';
     let limit = 50;
-    let isAdmin = false;
+    
+    // 1. Direct Email Check (From Request Body - Fastest)
+    const normalizedBodyEmail = (bodyEmail || '').toLowerCase().trim();
+    let isAdmin = normalizedBodyEmail === 'nmmart07@gmail.com' || normalizedBodyEmail === 'abduls9125@gmail.com';
 
+    // 2. Database Check (Fallback and for non-admins)
     try {
         const { data: userData } = await supabase.from('users').select('plan_name, daily_limit, email').eq('id', userId).single();
         
-        const userEmail = (userData?.email || '').toLowerCase().trim();
-        // HARDCODED ADMIN EMAILS for absolute power
-        isAdmin = userEmail === 'nmmart07@gmail.com' || 
-                  userEmail === 'abduls9125@gmail.com' || 
-                  userId === '5998a41a-6415-4673-9a7c-403487333555'; // Adding a known UID as fallback if email fetch fails
+        const dbEmail = (userData?.email || '').toLowerCase().trim();
+        if (!isAdmin) {
+            isAdmin = dbEmail === 'nmmart07@gmail.com' || dbEmail === 'abduls9125@gmail.com';
+        }
 
         plan = userData?.plan_name || 'Free';
         limit = userData?.daily_limit || 50;
     } catch (err) {
-        console.error("⚠️ Supabase User Fetch Failed, falling back to ID check:", err.message);
+        console.error("⚠️ Supabase User Fetch Failed:", err.message);
     }
 
     // --- ADMIN OVERRIDE: Unlock everything for YOU ---
     if (isAdmin) {
         plan = 'Enterprise';
         limit = 999999;
-        console.log(`👑 ADMIN POWER ACTIVATED: Unlimited access granted.`);
+        console.log(`👑 ADMIN POWER ACTIVATED for ${normalizedBodyEmail || userId}`);
     }
 
-    console.log(`📊 Session User: ${userId}, Plan: ${plan}, Limit: ${limit}, Contacts: ${contacts.length}`);
+    console.log(`📊 Request: user ${userId}, plan ${plan}, limit ${limit}, contacts ${contacts.length}`);
 
     if (contacts.length > limit && plan !== 'Gold' && plan !== 'Enterprise') {
         console.warn(`🚫 403: Plan Limit Exceeded (${plan}). Limit: ${limit}, Requested: ${contacts.length}`);
