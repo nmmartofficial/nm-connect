@@ -763,18 +763,26 @@ const startCampaign = async (userId, contacts, messages, media, poll, startIndex
             msg = spinMessage(msg); 
 
             // --- DYNAMIC PROFESSIONAL CLOSING GENERATOR ---
-            // Combining different parts to create 1000+ unique professional signatures
-            const salutations = ["Regards,", "Best Regards,", "Warm Regards,", "Thanks & Regards,", "Sincerely,", "With Regards,", "Best Wishes,", "Professional Regards,", "Yours Truly,", "Best,"];
+            // Creating thousands of unique combinations for anti-ban and professional look
+            const salutations = [
+                "Regards,", "Best Regards,", "Warm Regards,", "Thanks & Regards,", 
+                "Sincerely,", "With Regards,", "Best Wishes,", "Professional Regards,", 
+                "Yours Sincerely,", "Kind Regards,", "Best,", "Thank you,"
+            ];
+            
             const phrases = [
                 "Team NM Mart", 
-                "NM Mart Support Team", 
+                "NM Mart Sales Team", 
                 "Customer Success Team", 
-                "NM Mart Connect", 
+                "NM Mart Support", 
                 "The NM Mart Team", 
-                "NM Mart Helpdesk", 
+                "NM Mart Customer Care", 
                 "NM Mart Operations", 
-                "Team NM Mart Official"
+                "Team NM Mart Official",
+                "NM Mart Services",
+                "NM Mart Management"
             ];
+            
             const notes = [
                 "Thank you for choosing NM Mart!",
                 "Have a wonderful day ahead!",
@@ -786,7 +794,12 @@ const startCampaign = async (userId, contacts, messages, media, poll, startIndex
                 "Wishing you a productive day!",
                 "Thank you for your trust.",
                 "Happy to help you always!",
-                "" // Empty option for variety
+                "Best prices, always at NM Mart.",
+                "Quality products at best prices - NM Mart",
+                "Visit us again for exciting offers.",
+                "We are here to serve you better.",
+                "NM Mart - Your trusted shopping partner.",
+                "" // Variety
             ];
 
             const randomSalutation = salutations[Math.floor(Math.random() * salutations.length)];
