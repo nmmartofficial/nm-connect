@@ -91,6 +91,7 @@ const supabase = createClient(
 
 const whatsappClients = new Map(); // Store clients by userId
 const lastQRs = new Map(); // Store last QR by userId
+const whatsappUserNames = new Map(); // Store WhatsApp pushName by userId
 const initializationStates = new Map(); // Track initialization status per user
 const runningCampaigns = new Map(); // Tracks active campaigns by userId
 
@@ -193,6 +194,7 @@ const initializeWhatsApp = async (userId) => {
                 initializationStates.delete(userId);
                 whatsappClients.delete(userId);
                 lastQRs.delete(userId);
+                whatsappUserNames.delete(userId);
                 io.emit('whatsapp_disconnected', { userId });
 
                 if (shouldReconnect) {
@@ -206,11 +208,14 @@ const initializeWhatsApp = async (userId) => {
                 }
             } else if (connection === 'open') {
                 clearTimeout(timeout);
-                console.log(`🚀 WhatsApp Client for ${userId} is Ready and Connected!`);
+                const userName = client.authState.creds.me?.name || 'WhatsApp User';
+                whatsappUserNames.set(userId, userName);
+                
+                console.log(`🚀 WhatsApp Client for ${userId} (${userName}) is Ready and Connected!`);
                 io.emit('whatsapp_status', { msg: 'WhatsApp is Ready!' });
                 initializationStates.delete(userId);
                 lastQRs.delete(userId);
-                io.emit('whatsapp_ready', { userId });
+                io.emit('whatsapp_ready', { userId, userName });
             }
         });
 
@@ -454,6 +459,7 @@ const handleSessionRequest = (userId, socket) => {
     console.log(`📩 Session requested by: ${userId}`);
     const client = whatsappClients.get(userId);
     const lastQR = lastQRs.get(userId);
+    const userName = whatsappUserNames.get(userId);
 
     if (!client) {
         socket.emit('whatsapp_status', { msg: 'Initializing WhatsApp...' });
@@ -464,7 +470,7 @@ const handleSessionRequest = (userId, socket) => {
         }
         
         if (client.ws?.readyState === 1) { 
-            socket.emit('whatsapp_ready', { userId });
+            socket.emit('whatsapp_ready', { userId, userName });
         } else {
             socket.emit('whatsapp_status', { msg: 'Connecting...' });
         }

@@ -23,6 +23,7 @@ export default function App() {
   const [searchTerm, setSearchTerm] = useState('');
   const [logs, setLogs] = useState([]);
   const [isWhatsAppReady, setIsWhatsAppReady] = useState(false);
+  const [whatsappUserName, setWhatsappUserName] = useState('');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [messageVariations, setMessageVariations] = useState(() => {
     const saved = localStorage.getItem('messageVariations');
@@ -281,8 +282,22 @@ export default function App() {
       socket.emit('request_session', USER_ID);
     });
 
-    socket.on(`ready_${USER_ID}`, () => setIsWhatsAppReady(true));
-    socket.on(`disconnected_${USER_ID}`, () => setIsWhatsAppReady(false));
+    socket.on(`ready_${USER_ID}`, (data) => {
+      setIsWhatsAppReady(true);
+      if (data?.userName) setWhatsappUserName(data.userName);
+    });
+    
+    socket.on('whatsapp_ready', (data) => {
+      if (data?.userId === USER_ID) {
+        setIsWhatsAppReady(true);
+        if (data?.userName) setWhatsappUserName(data.userName);
+      }
+    });
+
+    socket.on(`disconnected_${USER_ID}`, () => {
+      setIsWhatsAppReady(false);
+      setWhatsappUserName('');
+    });
     
     socket.on(`log_${USER_ID}`, (newLog) => {
       console.log("📝 Received log via user event:", newLog);
@@ -572,6 +587,12 @@ export default function App() {
                 <button onClick={() => setIsMobileMenuOpen(true)}><Menu size={24}/></button>
             </div>
             <div className="flex items-center gap-4 ml-auto">
+                {isWhatsAppReady && whatsappUserName && (
+                  <div className="hidden md:flex items-center gap-2 px-3 py-1 bg-green-500/10 rounded-full border border-green-500/20">
+                    <Users size={14} className="text-green-500"/>
+                    <span className="text-[10px] font-black uppercase tracking-wider text-green-500">{whatsappUserName}</span>
+                  </div>
+                )}
                 <div className="hidden md:flex items-center gap-2 px-3 py-1 bg-blue-500/10 rounded-full border border-blue-500/20">
                     <Crown size={14} className="text-blue-500"/>
                     <span className="text-[10px] font-black uppercase tracking-wider text-blue-500">{userPlan.name} Plan</span>
