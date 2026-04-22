@@ -305,8 +305,11 @@ const startCampaign = async (userId, contacts, messages, media, startIndex, camp
         const contact = contacts[i];
         try {
             const cleanNumber = contact.number.toString().replace(/\D/g, '');
-            const chatId = `${cleanNumber}@s.whatsapp.net`; // Baileys format
+            // Ensure number has country code, default to 91 if 10 digits
+            const formattedNumber = cleanNumber.length === 10 ? `91${cleanNumber}` : cleanNumber;
+            const chatId = `${formattedNumber}@s.whatsapp.net`; // Baileys format
 
+            console.log(`🔍 Checking registration for: ${chatId}`);
             // 1. Check if number is registered on WhatsApp
             const [result] = await whatsappClient.onWhatsApp(chatId);
             
