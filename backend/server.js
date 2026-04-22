@@ -322,15 +322,15 @@ const initializeWhatsApp = async (userId) => {
 
                         let aiReply = "";
                         // Standard models that definitely work on v1 Stable
-                        const modelsToTry = ["gemini-1.5-flash", "gemini-pro"];
+                        const modelsToTry = ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-pro"];
                         
                         for (const modelName of modelsToTry) {
                             try {
                                 console.log(`🔄 [REST API] Trying ${modelName}...`);
                                 
-                                // Direct Fetch call to Google's Stable v1 Endpoint
+                                // Direct Fetch call to Google's v1beta Endpoint (Since v1 is giving 404 for some reason)
                                 const response = await fetch(
-                                    `https://generativelanguage.googleapis.com/v1/models/${modelName}:generateContent?key=${apiKey}`,
+                                    `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`,
                                     {
                                         method: 'POST',
                                         headers: { 'Content-Type': 'application/json' },
@@ -349,10 +349,24 @@ const initializeWhatsApp = async (userId) => {
                                 const data = await response.json();
                                 
                                 if (data.error) {
-                                    throw new Error(data.error.message);
+                                    // If v1beta also fails with 404, try one more time with different URL structure
+                                    console.log(`⚠️ ${modelName} v1beta failed, trying v1...`);
+                                    const responseV1 = await fetch(
+                                        `https://generativelanguage.googleapis.com/v1/models/${modelName}:generateContent?key=${apiKey}`,
+                                        {
+                                            method: 'POST',
+                                            headers: { 'Content-Type': 'application/json' },
+                                            body: JSON.stringify({
+                                                contents: [{ parts: [{ text: prompt }] }]
+                                            })
+                                        }
+                                    );
+                                    const dataV1 = await responseV1.json();
+                                    if (dataV1.error) throw new Error(dataV1.error.message);
+                                    aiReply = dataV1.candidates?.[0]?.content?.parts?.[0]?.text;
+                                } else {
+                                    aiReply = data.candidates?.[0]?.content?.parts?.[0]?.text;
                                 }
-
-                                aiReply = data.candidates?.[0]?.content?.parts?.[0]?.text;
                                 
                                 if (aiReply) {
                                     console.log(`✅ Success with ${modelName}`);
