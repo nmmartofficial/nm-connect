@@ -569,25 +569,40 @@ const startCampaign = async (userId, contacts, messages, media, startIndex, camp
                 progress: { current: i + 1, total: contacts.length, sent: sentCount, invalid: invalidCount, lastIndex: i }
             });
 
+            // --- THE ULTRA-HUMAN CHAOS ENGINE (NO PATTERNS) ---
             let delay;
-            const chaosChance = Math.random();
-
-            if (chaosChance < 0.05 && sentCount > 10) { 
-                const deepMinutes = Math.floor(Math.random() * (25 - 12 + 1)) + 12;
-                delay = deepMinutes * 60 * 1000;
-                console.log(`🛌 Deep Distraction: Going offline for ${deepMinutes} mins...`);
-                io.emit(`log_${userId}`, { type: 'info', msg: `🛌 Offline break for ${deepMinutes} mins...` });
-                await whatsappClient.sendPresenceUpdate('unavailable', chatId);
-            } else if (chaosChance < 0.15 && sentCount > 5) {
-                const quickMinutes = Math.floor(Math.random() * (5 - 2 + 1)) + 2;
-                delay = quickMinutes * 60 * 1000;
-                console.log(`📱 Quick Check: Waiting ${quickMinutes} mins...`);
-                io.emit(`log_${userId}`, { type: 'info', msg: `📱 Random phone check for ${quickMinutes} mins...` });
-            } else {
-                delay = Math.floor(Math.random() * (55000 - 20000 + 1)) + 20000;
-                console.log(`⏳ Waiting ${delay/1000}s for next message...`);
+            const seed = Math.random();
+            
+            // 1. Primary Delay (20-60s) - Base delay for every message
+            const baseDelay = Math.floor(Math.random() * (60000 - 20000 + 1)) + 20000;
+            
+            // 2. The "Micro-Distraction" (Every few messages, 1-3 mins)
+            if (seed < 0.15 && sentCount % 7 === 0) {
+                const microBreak = Math.floor(Math.random() * (180000 - 60000 + 1)) + 60000;
+                delay = baseDelay + microBreak;
+                console.log(`� Micro-distraction: Extra ${microBreak/1000}s break...`);
+            } 
+            // 3. The "Human Fluctuator" (Completely random spikes in delay)
+            else if (seed < 0.08) {
+                const randomSpike = Math.floor(Math.random() * (300000 - 120000 + 1)) + 120000;
+                delay = randomSpike;
+                console.log(`🤔 Thinking/Reading: Random spike of ${delay/1000}s...`);
+            }
+            // 4. The "Cluster logic" (Send 2-3 messages fast, then a longer pause)
+            else if (sentCount % 4 === 0) {
+                delay = Math.floor(Math.random() * (90000 - 45000 + 1)) + 45000;
+            }
+            else {
+                delay = baseDelay;
             }
 
+            // 5. Time-of-Day slowdown (Slower at night, faster in day - Mock logic)
+            const hour = new Date().getHours();
+            if (hour < 8 || hour > 22) {
+                delay *= 1.5; // Slow down by 50% during "sleeping hours"
+            }
+
+            console.log(`⏳ Waiting ${delay/1000}s for next message...`);
             await new Promise(r => setTimeout(r, delay));
    
         } catch (err) {
