@@ -2,10 +2,20 @@ require('dotenv').config();
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
-const { Client, LocalAuth, MessageMedia } = require('whatsapp-web.js');
+const { 
+    default: makeWASocket, 
+    useMultiFileAuthState, 
+    DisconnectReason, 
+    fetchLatestBaileysVersion, 
+    makeCacheableSignalKeyStore,
+    Browsers
+} = require('@whiskeysockets/baileys');
+const pino = require('pino');
 const qrcode = require('qrcode');
 const cors = require('cors');
 const { createClient } = require('@supabase/supabase-js');
+const fs = require('fs');
+const { join } = require('path');
 
 const app = express();
 app.use(cors());
@@ -35,171 +45,141 @@ let isInitializing = false;
 let lastQR = null;
 const runningCampaigns = new Map(); // Tracks active campaigns by userId
 
+// Global cleanup
+const cleanup = async () => {
+    if (whatsappClient) {
+        console.log("🧹 Cleaning up WhatsApp client...");
+        try {
+            whatsappClient.ev.removeAllListeners();
+            if (whatsappClient.ws) whatsappClient.ws.close();
+        } catch (e) {
+            console.error("Error during cleanup:", e);
+        }
+        whatsappClient = null;
+    }
+};
+
+process.on('SIGINT', async () => {
+    await cleanup();
+    process.exit(0);
+});
+
+process.on('SIGTERM', async () => {
+    await cleanup();
+    process.exit(0);
+});
+
 const initializeWhatsApp = async (userId) => {
     if (isInitializing) return;
     if (whatsappClient) return;
 
     isInitializing = true;
-    console.log(`🛠️ Initializing WhatsApp for user: ${userId}`);
-    io.emit('whatsapp_status', { msg: 'Starting Browser Engine...' });
-
-    // Thoda delay taaki purana process release ho jaye
-    await new Promise(r => setTimeout(r, 2000));
+    console.log(`🛠️ Initializing Baileys for user: ${userId}`);
+    io.emit('whatsapp_status', { msg: 'Starting WhatsApp Engine...' });
 
     try {
-        console.log("📂 Checking for Chrome in local cache...");
-        const { join } = require('path');
-        const fs = require('fs');
-        
-        // Auto-detect chrome path on Render
-        let chromePath = process.env.PUPPETEER_EXECUTABLE_PATH;
-        if (!chromePath) {
-            const cachePath = join(__dirname, '.cache', 'puppeteer');
-            if (fs.existsSync(cachePath)) {
-                console.log("✅ Puppeteer cache found at:", cachePath);
-            }
-        }
+        const { state, saveCreds } = await useMultiFileAuthState(join(__dirname, 'auth_info_baileys', userId));
+        const { version } = await fetchLatestBaileysVersion();
 
-        whatsappClient = new Client({
-            authStrategy: new LocalAuth({ 
-                clientId: userId,
-                dataPath: './.wwebjs_auth' 
-            }),
-            webVersionCache: {
-                type: 'remote',
-                remotePath: 'https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/2.2412.54.html',
+        whatsappClient = makeWASocket({
+            version,
+            printQRInTerminal: false,
+            auth: {
+                creds: state.creds,
+                keys: makeCacheableSignalKeyStore(state.keys, pino({ level: 'silent' })),
             },
-            puppeteer: {
-                headless: "new",
-                args: [
-                    '--no-sandbox',
-                    '--disable-setuid-sandbox',
-                    '--disable-dev-shm-usage',
-                    '--disable-accelerated-2d-canvas',
-                    '--no-first-run',
-                    '--no-zygote',
-                    '--disable-gpu',
-                    '--single-process',
-                    '--disable-extensions',
-                    '--disable-background-networking',
-                    '--disable-default-apps',
-                    '--disable-sync',
-                    '--disable-translate',
-                    '--hide-scrollbars',
-                    '--metrics-recording-only',
-                    '--mute-audio',
-                    '--safebrowsing-disable-auto-update',
-                    '--ignore-certificate-errors',
-                    '--ignore-ssl-errors',
-                    '--ignore-certificate-errors-spki-list',
-                    '--proxy-server="direct://"',
-                    '--proxy-bypass-list=*',
-                    '--js-flags="--max-old-space-size=256"'
-                ],
-                executablePath: chromePath || null,
+            logger: pino({ level: 'silent' }),
+            browser: Browsers.macOS('Desktop'), // More stable than default
+            syncFullHistory: false,
+            markOnlineOnConnect: true,
+        });
+
+        whatsappClient.ev.on('creds.update', saveCreds);
+
+        whatsappClient.ev.on('connection.update', async (update) => {
+            const { connection, lastDisconnect, qr } = update;
+
+            if (qr) {
+                console.log("✅ QR Code Generated.");
+                io.emit('whatsapp_status', { msg: 'QR Code Ready! Scan now.' });
+                lastQR = await qrcode.toDataURL(qr);
+                io.emit('qr_update', { qr: lastQR, userId });
             }
-        });
 
-        io.emit('whatsapp_status', { msg: 'Launching WhatsApp Engine...' });
-        console.log("⏳ Initializing WhatsApp Client...");
+            if (connection === 'close') {
+                const shouldReconnect = (lastDisconnect?.error)?.output?.statusCode !== DisconnectReason.loggedOut;
+                console.log('🔌 Connection closed due to ', lastDisconnect?.error, ', reconnecting ', shouldReconnect);
+                
+                isInitializing = false;
+                whatsappClient = null;
+                lastQR = null;
+                io.emit('whatsapp_disconnected');
 
-        // Set a safety timeout
-        const initTimeout = setTimeout(() => {
-            if (isInitializing && !lastQR) {
-                console.log("⚠️ Init taking too long, check Render logs for OOM");
-                io.emit('whatsapp_status', { msg: 'Still connecting... Render is slow' });
+                if (shouldReconnect) {
+                    initializeWhatsApp(userId);
+                }
+            } else if (connection === 'open') {
+                console.log('🚀 WhatsApp Client is Ready and Connected!');
+                io.emit('whatsapp_status', { msg: 'WhatsApp is Ready!' });
+                isInitializing = false;
+                lastQR = null;
+                io.emit('whatsapp_ready', { userId });
             }
-        }, 30000);
-
-        whatsappClient.on('qr', async (qr) => {
-            clearTimeout(initTimeout);
-            console.log("✅ QR Code Generated.");
-            io.emit('whatsapp_status', { msg: 'QR Code Ready! Scan now.' });
-            lastQR = await qrcode.toDataURL(qr);
-            io.emit('qr_update', { qr: lastQR, userId });
-        });
-
-        whatsappClient.on('authenticated', () => {
-            clearTimeout(initTimeout);
-            console.log("� Authenticated successfully! Loading chats...");
-            io.emit('whatsapp_status', { msg: 'Authenticated! Loading chats...' });
-            lastQR = null;
-            io.emit('whatsapp_authenticated', { userId });
-        });
-
-        whatsappClient.on('ready', () => {
-            clearTimeout(initTimeout);
-            console.log("� WhatsApp Client is Ready and Connected!");
-            io.emit('whatsapp_status', { msg: 'WhatsApp is Ready!' });
-            isInitializing = false;
-            lastQR = null;
-            io.emit('whatsapp_ready', { userId });
         });
 
         // --- AUTO-RESPONDER BOT (Keyword-based) ---
-        whatsappClient.on('message', async (msg) => {
-            if (msg.fromMe) return; // Don't respond to own messages
+        whatsappClient.ev.on('messages.upsert', async (m) => {
+            if (m.type !== 'notify') return;
             
-            const incomingMsg = msg.body.toLowerCase();
-            console.log(`📩 Received message from ${msg.from}: ${incomingMsg}`);
+            for (const msg of m.messages) {
+                if (msg.key.fromMe) continue;
 
-            // 1. Fetch user data to check plan
-            const { data: userData } = await supabase.from('users').select('plan_name').eq('id', userId).single();
-            const plan = userData?.plan_name || 'Free';
+                const from = msg.key.remoteJid;
+                const body = msg.message?.conversation || msg.message?.extendedTextMessage?.text || "";
+                const incomingMsg = body.toLowerCase();
 
-            // Bot only works for Gold/Enterprise users
-            if (plan !== 'Gold' && plan !== 'Enterprise') {
-                return;
-            }
+                if (!incomingMsg) continue;
 
-            // 2. Fetch auto-responses from Supabase for this user
-            const { data: responses } = await supabase
-                .from('auto_responses')
-                .select('*')
-                .eq('user_id', userId);
+                console.log(`📩 Received message from ${from}: ${incomingMsg}`);
 
-            if (responses && responses.length > 0) {
-                const matchedResponse = responses.find(r => incomingMsg.includes(r.keyword.toLowerCase()));
-                
-                if (matchedResponse) {
-                    console.log(`🤖 Auto-responding to ${msg.from} with keyword: ${matchedResponse.keyword}`);
+                // 1. Fetch user data to check plan
+                const { data: userData } = await supabase.from('users').select('plan_name').eq('id', userId).single();
+                const plan = userData?.plan_name || 'Free';
+
+                // Bot only works for Gold/Enterprise users
+                if (plan !== 'Gold' && plan !== 'Enterprise') {
+                    continue;
+                }
+
+                // 2. Fetch auto-responses from Supabase for this user
+                const { data: responses } = await supabase
+                    .from('auto_responses')
+                    .select('*')
+                    .eq('user_id', userId);
+
+                if (responses && responses.length > 0) {
+                    const matchedResponse = responses.find(r => incomingMsg.includes(r.keyword.toLowerCase()));
                     
-                    // Human-like delay before auto-reply
-                    await new Promise(r => setTimeout(r, Math.random() * 3000 + 2000));
-                    
-                    await msg.reply(matchedResponse.response);
-                    
-                    io.emit(`log_${userId}`, { 
-                        type: 'info', 
-                        msg: `🤖 Bot: Auto-replied to ${msg.from.split('@')[0]} (Keyword: ${matchedResponse.keyword})` 
-                    });
+                    if (matchedResponse) {
+                        console.log(`🤖 Auto-responding to ${from} with keyword: ${matchedResponse.keyword}`);
+                        
+                        // Human-like delay before auto-reply
+                        await new Promise(r => setTimeout(r, Math.random() * 3000 + 2000));
+                        
+                        await whatsappClient.sendMessage(from, { text: matchedResponse.response });
+                        
+                        io.emit(`log_${userId}`, { 
+                            type: 'info', 
+                            msg: `🤖 Bot: Auto-replied to ${from.split('@')[0]} (Keyword: ${matchedResponse.keyword})` 
+                        });
+                    }
                 }
             }
         });
 
-        whatsappClient.on('auth_failure', (msg) => {
-            console.error("❌ Auth Failure:", msg);
-            isInitializing = false;
-            whatsappClient = null;
-            io.emit('whatsapp_error', { message: 'Auth failed' });
-        });
-
-        whatsappClient.on('disconnected', (reason) => {
-            console.log("🔌 WhatsApp Disconnected:", reason);
-            isInitializing = false;
-            whatsappClient = null;
-            lastQR = null;
-            io.emit('whatsapp_disconnected');
-        });
-
-        whatsappClient.initialize().catch(err => {
-            console.error("💥 Init Error:", err.message);
-            isInitializing = false;
-            whatsappClient = null;
-        });
     } catch (error) {
-        console.error("❌ Failed to initialize WhatsApp:", error);
-        io.emit('whatsapp_status', { msg: 'Error: Browser failed to start' });
+        console.error("❌ Failed to initialize Baileys:", error);
+        io.emit('whatsapp_status', { msg: 'Error: Engine failed to start' });
         isInitializing = false;
         whatsappClient = null;
     }
@@ -222,16 +202,12 @@ const handleSessionRequest = (userId, socket) => {
             socket.emit('qr_update', { qr: lastQR, userId });
         }
         
-        whatsappClient.getState().then(state => {
-            console.log(`📡 Current WhatsApp State: ${state}`);
-            if (state === 'CONNECTED') {
-                socket.emit('whatsapp_ready', { userId });
-            } else {
-                socket.emit('whatsapp_status', { msg: `Status: ${state || 'Initializing...'}` });
-            }
-        }).catch(() => {
+        // Check connection status in Baileys
+        if (whatsappClient.ws?.readyState === 1) { // 1 is OPEN
+            socket.emit('whatsapp_ready', { userId });
+        } else {
             socket.emit('whatsapp_status', { msg: 'Connecting...' });
-        });
+        }
     }
 };
 
@@ -300,11 +276,15 @@ app.post('/api/send-bulk', async (req, res) => {
 
 // Extracted Campaign Logic for Reusability (Scheduling)
 const startCampaign = async (userId, contacts, messages, media, startIndex, campaignId) => {
-    let messageMedia = null;
+    let mediaBuffer = null;
+    let mediaType = null;
+    
     if (media && media.data) {
         try {
-            messageMedia = new MessageMedia(media.mimetype, media.data, media.filename);
-            console.log("📎 Media attached to campaign");
+            mediaBuffer = Buffer.from(media.data, 'base64');
+            mediaType = media.mimetype.startsWith('image') ? 'image' : 
+                        media.mimetype.startsWith('video') ? 'video' : 'document';
+            console.log(`📎 Media attached to campaign: ${mediaType}`);
         } catch (mediaErr) {
             console.error("❌ Media creation error:", mediaErr.message);
         }
@@ -313,10 +293,6 @@ const startCampaign = async (userId, contacts, messages, media, startIndex, camp
     let sentCount = 0;
     let invalidCount = 0;
     
-    // Randomize batch thresholds initially to prevent any fixed patterns
-    let nextDistractionAt = Math.floor(Math.random() * (15 - 8 + 1)) + 8; 
-    let nextCoffeeAt = Math.floor(Math.random() * (55 - 35 + 1)) + 35;
-
     // Start from the provided index
     for (let i = startIndex; i < contacts.length; i++) {
         // Check if user clicked STOP
@@ -329,12 +305,12 @@ const startCampaign = async (userId, contacts, messages, media, startIndex, camp
         const contact = contacts[i];
         try {
             const cleanNumber = contact.number.toString().replace(/\D/g, '');
-            const chatId = `${cleanNumber}@c.us`;
+            const chatId = `${cleanNumber}@s.whatsapp.net`; // Baileys format
 
             // 1. Check if number is registered on WhatsApp
-            const isRegistered = await whatsappClient.isRegisteredUser(chatId);
+            const [result] = await whatsappClient.onWhatsApp(chatId);
             
-            if (!isRegistered) {
+            if (!result || !result.exists) {
                 console.log(`🚫 Number ${cleanNumber} is not registered on WhatsApp. Removing...`);
                 await supabase.from('customers').delete().eq('id', contact.id);
                 invalidCount++;
@@ -347,9 +323,7 @@ const startCampaign = async (userId, contacts, messages, media, startIndex, camp
                   continue; // Skip to next contact
                }
 
-                // --- THE CHAOS ENGINE: 100% UNPREDICTABLE BUSINESS MESSAGING ---
-                
-                // A. Professional Closings Variation (Prevents text pattern detection)
+                // --- THE CHAOS ENGINE ---
                 const offerCode = `NM${Math.floor(1000 + Math.random() * 9000)}`;
                 const closings = [
                     `\n\n*Ref: ${offerCode}*`,
@@ -361,7 +335,6 @@ const startCampaign = async (userId, contacts, messages, media, startIndex, camp
                 ];
                 const closing = closings[Math.floor(Math.random() * closings.length)];
 
-                // B. Spintax + Name Personalization
                 const spinMessage = (text) => {
                     return text.replace(/{([^{}]+)}/g, (match, options) => {
                         const choices = options.split('|');
@@ -375,27 +348,28 @@ const startCampaign = async (userId, contacts, messages, media, startIndex, camp
 
                 const finalMsg = `${msg}${closing}`;
 
-                const chat = await whatsappClient.getChatById(chatId);
-                
-                // C. Simulate Human "Pre-Message" Behavior
-                await whatsappClient.sendPresenceAvailable();
+                // Simulate Human Behavior
+                await whatsappClient.sendPresenceUpdate('available', chatId);
                 io.emit(`log_${userId}`, { type: 'info', msg: `📖 Checking chat with ${contact.number}...` });
-                await chat.sendSeen(); 
-                await new Promise(r => setTimeout(r, Math.random() * 2000 + 500)); // Read for 0.5-2.5s
                 
-                // D. Variable Typing & "Thinking" Pauses
-                await chat.sendStateTyping();
+                await new Promise(r => setTimeout(r, Math.random() * 2000 + 500)); 
+                
+                await whatsappClient.sendPresenceUpdate('composing', chatId);
                 const typingTime = Math.min(finalMsg.length * (Math.random() * 25 + 15), 5000); 
                 io.emit(`log_${userId}`, { type: 'info', msg: `✍️ Typing personalized offer...` });
                 await new Promise(r => setTimeout(r, typingTime));
 
-                // Tiny pause after typing (thinking before clicking send)
                 await new Promise(r => setTimeout(r, Math.random() * 1500 + 500));
 
-                if (messageMedia) {
-                    await whatsappClient.sendMessage(chatId, messageMedia, { caption: finalMsg });
+                if (mediaBuffer) {
+                    const sendMsg = {};
+                    sendMsg[mediaType] = mediaBuffer;
+                    sendMsg.caption = finalMsg;
+                    if (mediaType === 'document') sendMsg.fileName = media.filename || 'document';
+                    
+                    await whatsappClient.sendMessage(chatId, sendMsg);
                 } else {
-                    await whatsappClient.sendMessage(chatId, finalMsg);
+                    await whatsappClient.sendMessage(chatId, { text: finalMsg });
                 }
 
                 sentCount++;
@@ -403,37 +377,31 @@ const startCampaign = async (userId, contacts, messages, media, startIndex, camp
 
                 await supabase.from('customers').update({ status: 'Sent' }).eq('id', contact.id);
                 
-                // Update Campaign Record intermittently
                 if (campaignId) {
                     await supabase.from('campaigns').update({ sent_count: sentCount, invalid_count: invalidCount }).eq('id', campaignId);
                 }
 
-                // Emit progress update
                 io.emit(`log_${userId}`, { 
                     type: 'success', 
                     msg: `Sent to ${contact.number}`,
                     progress: { current: i + 1, total: contacts.length, sent: sentCount, invalid: invalidCount, lastIndex: i }
                 });
 
-                // E. PROBABILITY-BASED CHAOS (No fixed cycles or patterns)
                 let delay;
-                const chaosChance = Math.random(); // 0 to 1
+                const chaosChance = Math.random();
 
                 if (chaosChance < 0.05 && sentCount > 10) { 
-                    // 5% CHANCE: "Deep Distraction" (12-25 mins) + GO OFFLINE
                     const deepMinutes = Math.floor(Math.random() * (25 - 12 + 1)) + 12;
                     delay = deepMinutes * 60 * 1000;
                     console.log(`🛌 Deep Distraction: Going offline for ${deepMinutes} mins...`);
                     io.emit(`log_${userId}`, { type: 'info', msg: `🛌 Offline break for ${deepMinutes} mins...` });
-                    await whatsappClient.sendPresenceUnavailable(); // Simulate locking phone
+                    await whatsappClient.sendPresenceUpdate('unavailable', chatId);
                 } else if (chaosChance < 0.15 && sentCount > 5) {
-                    // 10% CHANCE: "Quick Phone Check" (2-5 mins)
                     const quickMinutes = Math.floor(Math.random() * (5 - 2 + 1)) + 2;
                     delay = quickMinutes * 60 * 1000;
                     console.log(`📱 Quick Check: Waiting ${quickMinutes} mins...`);
                     io.emit(`log_${userId}`, { type: 'info', msg: `📱 Random phone check for ${quickMinutes} mins...` });
                 } else {
-                    // REGULAR HUMAN DELAY (20-55 seconds)
                     delay = Math.floor(Math.random() * (55000 - 20000 + 1)) + 20000;
                     console.log(`⏳ Waiting ${delay/1000}s for next message...`);
                 }
@@ -452,7 +420,6 @@ const startCampaign = async (userId, contacts, messages, media, startIndex, camp
        console.log("🏁 Campaign finished");
        runningCampaigns.delete(userId);
  
-       // Final Campaign Update
        if (campaignId) {
            await supabase.from('campaigns').update({ status: 'Completed', sent_count: sentCount, invalid_count: invalidCount }).eq('id', campaignId);
        }

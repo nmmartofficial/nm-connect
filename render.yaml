@@ -3,7 +3,7 @@ services:
     name: nm-connect-backend
     runtime: node
     rootDir: backend
-    buildCommand: npm install && npx puppeteer browsers install chrome
+    buildCommand: npm install
     startCommand: node server.js
     envVars:
       - key: NODE_VERSION
