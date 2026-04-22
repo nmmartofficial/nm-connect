@@ -35,6 +35,8 @@ export default function App() {
   const [selectedIds, setSelectedIds] = useState([]);
   const [userPlan, setUserPlan] = useState({ name: 'Free', limit: 50 }); // Initial state
   const [showPaymentModal, setShowPaymentModal] = useState(null); // { plan, price }
+  const [showAddContactModal, setShowAddContactModal] = useState(false);
+  const [newContact, setNewContact] = useState({ name: '', number: '' });
   const [campaignProgress, setCampaignProgress] = useState(() => {
     const saved = localStorage.getItem('campaignProgress');
     return saved ? JSON.parse(saved) : { current: 0, total: 0, sent: 0, invalid: 0, lastIndex: -1 };
@@ -367,6 +369,32 @@ export default function App() {
     }
   };
 
+  const handleAddSingleContact = async (e) => {
+    e.preventDefault();
+    if (!newContact.number || newContact.number.length < 10) {
+      alert("Please enter a valid 10-digit number");
+      return;
+    }
+
+    setLoading(true);
+    const { error } = await supabase.from('customers').insert([{
+      name: newContact.name || 'Customer',
+      number: newContact.number.replace(/\D/g, ''),
+      status: 'Pending',
+      user_id: USER_ID
+    }]);
+
+    if (!error) {
+      setNewContact({ name: '', number: '' });
+      setShowAddContactModal(false);
+      fetchCustomers();
+      setLogs(prev => [{ type: 'success', msg: `New contact added: ${newContact.number}`, time: new Date().toLocaleTimeString() }, ...prev]);
+    } else {
+      alert("Error adding contact: " + error.message);
+    }
+    setLoading(false);
+  };
+
   const filteredCustomers = customers.filter(c => 
     c.name?.toLowerCase().includes(searchTerm.toLowerCase()) || 
     c.number?.toString().includes(searchTerm)
@@ -502,10 +530,16 @@ export default function App() {
                                                 </div>
                                             )}
                                         </div>
-                                        <label className="cursor-pointer bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-2 transition-all">
+                                            <label className="cursor-pointer bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-2 transition-all">
                                             <Upload size={14}/> Import Excel
                                             <input type="file" className="hidden" onChange={handleFileUpload} accept=".xlsx,.xls" />
                                         </label>
+                                        <button 
+                                            onClick={() => setShowAddContactModal(true)}
+                                            className="bg-slate-800 hover:bg-slate-700 text-white px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-2 transition-all border border-slate-700"
+                                        >
+                                            <Users size={14}/> Add Contact
+                                        </button>
                                         <button onClick={deleteData} className="p-2 bg-red-500/10 text-red-500 rounded-lg hover:bg-red-500/20 transition-all"><Trash2 size={18}/></button>
                                     </div>
                                 </div>
@@ -994,6 +1028,53 @@ export default function App() {
                 </div>
             )}
         </main>
+
+        {/* ADD CONTACT MODAL */}
+        {showAddContactModal && (
+            <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-200">
+                <div className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-md overflow-hidden shadow-2xl">
+                    <div className="p-6 border-b border-slate-800 flex justify-between items-center bg-slate-800/30">
+                        <h3 className="font-black uppercase tracking-widest text-sm flex items-center gap-2">
+                            <Users size={18} className="text-blue-500"/> Add New Contact
+                        </h3>
+                        <button onClick={() => setShowAddContactModal(false)} className="text-slate-500 hover:text-white"><X size={20}/></button>
+                    </div>
+                    <form onSubmit={handleAddSingleContact} className="p-8 space-y-6">
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-[10px] font-black text-slate-500 uppercase mb-2 tracking-widest">Customer Name</label>
+                                <input 
+                                    type="text" 
+                                    value={newContact.name}
+                                    onChange={(e) => setNewContact({...newContact, name: e.target.value})}
+                                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3.5 text-white font-bold text-sm focus:outline-none focus:border-blue-600 transition-all"
+                                    placeholder="e.g. Rahul Kumar"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-[10px] font-black text-slate-500 uppercase mb-2 tracking-widest">WhatsApp Number (10 Digits)</label>
+                                <input 
+                                    type="tel" 
+                                    value={newContact.number}
+                                    onChange={(e) => setNewContact({...newContact, number: e.target.value})}
+                                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3.5 text-white font-bold text-sm focus:outline-none focus:border-blue-600 transition-all"
+                                    placeholder="e.g. 9876543210"
+                                    required
+                                    maxLength="10"
+                                />
+                            </div>
+                        </div>
+                        <button 
+                            type="submit"
+                            disabled={loading}
+                            className="w-full bg-blue-600 hover:bg-blue-500 text-white font-black py-4 rounded-xl shadow-lg transition-all active:scale-95 text-xs tracking-widest uppercase"
+                        >
+                            {loading ? "Adding..." : "Add to List"}
+                        </button>
+                    </form>
+                </div>
+            </div>
+        )}
 
         {/* PAYMENT MODAL */}
         {showPaymentModal && (
