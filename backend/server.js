@@ -314,6 +314,37 @@ const initializeWhatsApp = async (userId) => {
                     }
                 }
 
+                // 2.5 Smart Inventory Search (Before AI)
+                if (!matched) {
+                    try {
+                        console.log(`🔍 Searching Inventory for: "${incomingMsg}"`);
+                        const { data: products } = await supabase
+                            .from('inventory')
+                            .select('*')
+                            .eq('user_id', userId)
+                            .ilike('product_name', `%${incomingMsg}%`)
+                            .limit(1);
+
+                        if (products && products.length > 0) {
+                            const p = products[0];
+                            matched = true;
+                            const reply = `🛍️ *Product Found:* ${p.product_name}\n\n` +
+                                          `💰 *MRP:* ₹${p.mrp}\n` +
+                                          `🔥 *Sale Price:* ₹${p.sale_price}\n` +
+                                          `🏷️ *Discount:* ${p.discount}% OFF\n\n` +
+                                          `✅ *Status:* ${p.stock_status || 'In Stock'}\n\n` +
+                                          `_NM Mart - Best Prices Always!_`;
+
+                            console.log(`📦 Inventory Match: ${p.product_name}`);
+                            await new Promise(r => setTimeout(r, Math.random() * 2000 + 1000));
+                            await client.sendMessage(from, { text: reply });
+                            io.emit(`log_${userId}`, { type: 'info', msg: `📦 Inventory Bot: Sent details for ${p.product_name}` });
+                        }
+                    } catch (invErr) {
+                        console.error("⚠️ Inventory Search Error:", invErr.message);
+                    }
+                }
+
                 // 3. AI Reply (Direct REST API Call - No SDK)
                 if (!matched) {
                     if (!apiKey) {

@@ -35,6 +35,72 @@ export default function App() {
   const [stats, setStats] = useState({ total: 0, sent: 0, pending: 0, invalid: 0 });
   const [autoResponses, setAutoResponses] = useState([]);
   const [newAutoResponse, setNewAutoResponse] = useState({ keyword: '', response: '' });
+  const [inventory, setInventory] = useState([]);
+  const [newInventory, setNewInventory] = useState({ product_name: '', mrp: '', sale_price: '', discount: '' });
+
+  const fetchInventory = async () => {
+    if (!USER_ID) return;
+    const { data } = await supabase.from('inventory').select('*').eq('user_id', USER_ID).order('created_at', { ascending: false });
+    if (data) setInventory(data);
+  };
+
+  const addInventoryItem = async () => {
+    if (!newInventory.product_name || !newInventory.sale_price) {
+      alert("Please fill product name and sale price");
+      return;
+    }
+    const { error } = await supabase.from('inventory').insert([{ ...newInventory, user_id: USER_ID }]);
+    if (!error) {
+      setNewInventory({ product_name: '', mrp: '', sale_price: '', discount: '' });
+      fetchInventory();
+    }
+  };
+
+  const deleteInventoryItem = async (id) => {
+    const { error } = await supabase.from('inventory').delete().eq('id', id);
+    if (!error) fetchInventory();
+  };
+
+  const handleInventoryFileUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    setLoading(true);
+    const reader = new FileReader();
+    reader.onload = async (evt) => {
+      try {
+        const text = evt.target.result;
+        const rows = text.split('\n').filter(row => row.trim() !== '');
+        
+        // Skip header if it exists
+        const dataRows = rows[0].toLowerCase().includes('product') ? rows.slice(1) : rows;
+        
+        const items = dataRows.map(row => {
+          const parts = row.split(',');
+          if (parts.length < 2) return null;
+          return {
+            user_id: USER_ID,
+            product_name: parts[0]?.trim(),
+            mrp: parseFloat(parts[1]) || 0,
+            sale_price: parseFloat(parts[2]) || 0,
+            discount: parseFloat(parts[3]) || 0
+          };
+        }).filter(item => item && item.product_name);
+
+        if (items.length === 0) throw new Error("No valid products found in file.");
+
+        const { error } = await supabase.from('inventory').insert(items);
+        if (error) throw error;
+        alert(`Successfully imported ${items.length} products!`);
+        fetchInventory();
+      } catch (err) {
+        alert("Error uploading file: " + err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+    reader.readAsText(file);
+  };
   const [selectedIds, setSelectedIds] = useState([]);
   const [userPlan, setUserPlan] = useState({ name: 'Free', limit: 50 }); // Initial state
   const [showPaymentModal, setShowPaymentModal] = useState(null); // { plan, price }
@@ -206,6 +272,7 @@ export default function App() {
     if (!USER_ID) return;
     fetchCustomers();
     fetchAutoResponses();
+    fetchInventory();
     fetchCampaignHistory();
     fetchUserPlan();
     
@@ -941,6 +1008,102 @@ export default function App() {
                                     )) : (
                                         <tr>
                                             <td colSpan="3" className="p-8 text-center text-slate-500 text-sm italic">No auto-responses set. Add one above!</td>
+                                        </tr>
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    {/* SMART INVENTORY SEARCH SECTION */}
+                    <div className="bg-slate-900 rounded-2xl border border-slate-800 overflow-hidden">
+                        <div className="p-4 border-b border-slate-800 bg-slate-800/30 flex justify-between items-center">
+                            <div className="flex items-center gap-2">
+                                <Search size={18} className="text-blue-500"/>
+                                <h3 className="font-bold">Smart Inventory Search</h3>
+                            </div>
+                            <label className="cursor-pointer bg-slate-800 hover:bg-slate-700 text-slate-300 px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all border border-slate-700 flex items-center gap-2">
+                                <FileUp size={14}/> Upload CSV
+                                <input type="file" accept=".csv,.txt" className="hidden" onChange={handleInventoryFileUpload} />
+                            </label>
+                        </div>
+                        
+                        <div className="p-6 grid grid-cols-1 md:grid-cols-5 gap-4">
+                            <div className="space-y-1">
+                                <label className="text-[10px] font-bold uppercase text-slate-500 ml-1">Product Name</label>
+                                <input 
+                                    type="text" 
+                                    placeholder="e.g. Colgate" 
+                                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-sm outline-none focus:border-blue-500 transition-all"
+                                    value={newInventory.product_name}
+                                    onChange={(e) => setNewInventory({...newInventory, product_name: e.target.value})}
+                                />
+                            </div>
+                            <div className="space-y-1">
+                                <label className="text-[10px] font-bold uppercase text-slate-500 ml-1">MRP</label>
+                                <input 
+                                    type="number" 
+                                    placeholder="0.00" 
+                                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-sm outline-none focus:border-blue-500 transition-all"
+                                    value={newInventory.mrp}
+                                    onChange={(e) => setNewInventory({...newInventory, mrp: e.target.value})}
+                                />
+                            </div>
+                            <div className="space-y-1">
+                                <label className="text-[10px] font-bold uppercase text-slate-500 ml-1">Sale Price</label>
+                                <input 
+                                    type="number" 
+                                    placeholder="0.00" 
+                                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-sm outline-none focus:border-blue-500 transition-all"
+                                    value={newInventory.sale_price}
+                                    onChange={(e) => setNewInventory({...newInventory, sale_price: e.target.value})}
+                                />
+                            </div>
+                            <div className="space-y-1">
+                                <label className="text-[10px] font-bold uppercase text-slate-500 ml-1">Discount %</label>
+                                <input 
+                                    type="number" 
+                                    placeholder="0" 
+                                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-sm outline-none focus:border-blue-500 transition-all"
+                                    value={newInventory.discount}
+                                    onChange={(e) => setNewInventory({...newInventory, discount: e.target.value})}
+                                />
+                            </div>
+                            <div className="flex items-end">
+                                <button 
+                                    onClick={addInventoryItem}
+                                    className="w-full bg-blue-600 hover:bg-blue-700 text-white font-black uppercase tracking-widest rounded-xl py-3 px-6 transition-all shadow-lg shadow-blue-500/20"
+                                >
+                                    Add Product
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="max-h-[300px] overflow-y-auto border-t border-slate-800">
+                            <table className="w-full text-left">
+                                <thead className="bg-slate-950/50 sticky top-0 text-[10px] uppercase text-slate-500 font-bold tracking-widest border-b border-slate-800">
+                                    <tr>
+                                        <th className="p-4">Product Name</th>
+                                        <th className="p-4">MRP</th>
+                                        <th className="p-4">Sale Price</th>
+                                        <th className="p-4">Discount</th>
+                                        <th className="p-4 text-right">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-800/50">
+                                    {inventory.length > 0 ? inventory.map((p, i) => (
+                                        <tr key={i} className="hover:bg-slate-800/30 transition-colors group text-sm">
+                                            <td className="p-4 font-bold text-slate-200">{p.product_name}</td>
+                                            <td className="p-4 text-slate-400">₹{p.mrp}</td>
+                                            <td className="p-4 text-green-500 font-bold">₹{p.sale_price}</td>
+                                            <td className="p-4 text-blue-500 font-bold">{p.discount}% OFF</td>
+                                            <td className="p-4 text-right">
+                                                <button onClick={() => deleteInventoryItem(p.id)} className="p-2 text-slate-500 hover:text-red-400 transition-colors"><Trash2 size={16}/></button>
+                                            </td>
+                                        </tr>
+                                    )) : (
+                                        <tr>
+                                            <td colSpan="5" className="p-8 text-center text-slate-500 text-sm italic">No products in inventory. Add manually or upload CSV!</td>
                                         </tr>
                                     )}
                                 </tbody>
