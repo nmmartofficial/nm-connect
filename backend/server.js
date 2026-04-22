@@ -302,48 +302,57 @@ const initializeWhatsApp = async (userId) => {
                     }
                 }
 
-                // 3. AI Reply (Gemini)
+                // 3. AI Reply (Direct REST API Call - No SDK)
                 if (!matched) {
-                    if (!genAI) {
-                        console.error("❌ AI Error: genAI is not initialized. Check GEMINI_API_KEY in Render env.");
+                    if (!apiKey) {
+                        console.error("❌ AI Error: GEMINI_API_KEY is missing in environment.");
                         continue;
                     }
 
                     try {
                         const senderNumber = from.split('@')[0];
-                        console.log(`🧠 AI Thinking for ${senderNumber}... (Input: "${body}")`);
+                        console.log(`🧠 AI Thinking (Direct API) for ${senderNumber}...`);
                         
                         await client.sendPresenceUpdate('composing', from);
                         
                         const prompt = `You are NM Connect's AI Assistant. 
                         Customer says: "${body}". 
-                        Task: Reply politely and keep it very short (max 2 sentences). 
-                        Language: Use the same language as the customer.`;
+                        Reply politely and keep it very short (max 2 sentences). 
+                        Language: Same as customer.`;
 
                         let aiReply = "";
-                        // STRICT MODELS: These are confirmed to work on v1 Stable
+                        // Standard models that definitely work on v1 Stable
                         const modelsToTry = ["gemini-1.5-flash", "gemini-pro"];
                         
-                        // Safety settings: To prevent empty responses
-                        const safetySettings = [
-                            { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
-                            { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
-                            { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
-                            { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" },
-                        ];
-
                         for (const modelName of modelsToTry) {
                             try {
-                                console.log(`🔄 [STRICT] Trying ${modelName}...`);
-                                // Call without any extra options, let the constructor's v1 handle it
-                                const model = genAI.getGenerativeModel({ 
-                                    model: modelName,
-                                    safetySettings 
-                                });
+                                console.log(`🔄 [REST API] Trying ${modelName}...`);
                                 
-                                const result = await model.generateContent(prompt);
-                                const response = await result.response;
-                                aiReply = response.text();
+                                // Direct Fetch call to Google's Stable v1 Endpoint
+                                const response = await fetch(
+                                    `https://generativelanguage.googleapis.com/v1/models/${modelName}:generateContent?key=${apiKey}`,
+                                    {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({
+                                            contents: [{ parts: [{ text: prompt }] }],
+                                            safetySettings: [
+                                                { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
+                                                { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
+                                                { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
+                                                { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" }
+                                            ]
+                                        })
+                                    }
+                                );
+
+                                const data = await response.json();
+                                
+                                if (data.error) {
+                                    throw new Error(data.error.message);
+                                }
+
+                                aiReply = data.candidates?.[0]?.content?.parts?.[0]?.text;
                                 
                                 if (aiReply) {
                                     console.log(`✅ Success with ${modelName}`);
@@ -357,12 +366,12 @@ const initializeWhatsApp = async (userId) => {
                         if (aiReply) {
                             await client.sendMessage(from, { text: aiReply });
                             console.log(`✅ AI Replied: "${aiReply.substring(0, 50)}..."`);
-                            io.emit(`log_${userId}`, { type: 'info', msg: `🧠 AI Bot: Replied to ${senderNumber} via Gemini` });
+                            io.emit(`log_${userId}`, { type: 'info', msg: `🧠 AI Bot: Replied to ${senderNumber} via Direct API` });
                         } else {
-                            console.log("⚠️ Gemini returned an empty response.");
+                            console.log("⚠️ All models failed or returned empty response.");
                         }
                     } catch (aiErr) {
-                        console.error(`❌ Gemini API Final Error:`, aiErr.message);
+                        console.error(`❌ Final AI Error:`, aiErr.message);
                         io.emit(`log_${userId}`, { type: 'error', msg: `❌ AI Error: ${aiErr.message}` });
                     }
                 }
