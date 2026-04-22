@@ -255,7 +255,8 @@ const initializeWhatsApp = async (userId) => {
                 // 3. Smart AI Reply (Gemini) - Fallback if no keyword matches
                 if (aiModel) {
                     try {
-                        console.log(`🧠 AI Bot: Thinking of a reply for ${from.split('@')[0]}...`);
+                        const senderNumber = from.split('@')[0];
+                        console.log(`🧠 AI Bot: Thinking of a reply for ${senderNumber}...`);
                         
                         // Human-like thinking delay
                         await new Promise(r => setTimeout(r, Math.random() * 5000 + 3000));
@@ -268,15 +269,23 @@ const initializeWhatsApp = async (userId) => {
                         const result = await aiModel.generateContent(prompt);
                         const aiReply = result.response.text();
 
-                        await whatsappClient.sendMessage(from, { text: aiReply });
-                        
-                        io.emit(`log_${userId}`, { 
-                            type: 'info', 
-                            msg: `🧠 AI Bot: Replied to ${from.split('@')[0]} using Gemini` 
-                        });
+                        if (aiReply) {
+                            await whatsappClient.sendMessage(from, { text: aiReply });
+                            console.log(`✅ AI Bot: Successfully replied to ${senderNumber}`);
+                            io.emit(`log_${userId}`, { 
+                                type: 'info', 
+                                msg: `🧠 AI Bot: Replied to ${senderNumber} using Gemini` 
+                            });
+                        }
                     } catch (aiErr) {
                         console.error("❌ Gemini AI Error:", aiErr.message);
+                        io.emit(`log_${userId}`, { 
+                            type: 'error', 
+                            msg: `🧠 AI Bot Error: ${aiErr.message}` 
+                        });
                     }
+                } else {
+                    console.log("ℹ️ AI Bot skipped: No GEMINI_API_KEY configured.");
                 }
             }
         });
