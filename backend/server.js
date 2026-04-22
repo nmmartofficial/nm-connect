@@ -771,7 +771,18 @@ const startCampaign = async (userId, contacts, messages, media, poll, startIndex
                 `\n\n*Thank you!*\n_For any queries, feel free to reply._`,
                 `\n\n*Warm Regards,*\n*NM Mart Connect*`,
                 `\n\n_Stay connected with us for more updates._\n*Team NM Mart*`,
-                `\n\n*Thanks & Regards,*\n*NM Mart*`
+                `\n\n*Thanks & Regards,*\n*NM Mart*`,
+                `\n\n*Sincerely,*\n*The NM Mart Team*`,
+                `\n\n_Wishing you a great day!_\n*Best, NM Mart*`,
+                `\n\n*With Regards,*\n*NM Mart Support*`,
+                `\n\n*Thank you for your trust.*\n*Team NM Mart*`,
+                `\n\n_Happy to help!_\n*Regards, NM Mart*`,
+                `\n\n*Best Wishes,*\n*NM Mart*`,
+                `\n\n_Looking forward to serving you again._\n*Team NM Mart*`,
+                `\n\n*Professional Regards,*\n*NM Mart*`,
+                `\n\n*Kindly reach out if you have questions.*\n*Regards, NM Mart*`,
+                `\n\n*Have a productive day!*\n*Team NM Mart*`,
+                `\n\n*Your satisfaction is our priority.*\n*Regards, NM Mart*`
             ];
             const closing = closings[Math.floor(Math.random() * closings.length)];
             const finalMsg = `${msg}${closing}`;
