@@ -70,28 +70,48 @@ process.on('SIGTERM', async () => {
 });
 
 const initializeWhatsApp = async (userId) => {
-    if (isInitializing) return;
-    if (whatsappClient) return;
+    if (isInitializing) {
+        console.log(`⚠️ Initialization already in progress for user: ${userId}`);
+        return;
+    }
+    if (whatsappClient) {
+        console.log(`✅ WhatsApp already connected for user: ${userId}`);
+        return;
+    }
 
     isInitializing = true;
     console.log(`🛠️ Initializing Baileys for user: ${userId}`);
     io.emit('whatsapp_status', { msg: 'Starting WhatsApp Engine...' });
 
     try {
-        const { state, saveCreds } = await useMultiFileAuthState(join(__dirname, 'auth_info_baileys', userId));
-        const { version } = await fetchLatestBaileysVersion();
+        const authPath = join(__dirname, 'auth_info_baileys', userId);
+        
+        // Safety: If it takes too long, reset isInitializing
+        const timeout = setTimeout(() => {
+            if (isInitializing && !whatsappClient) {
+                console.log("🕒 Init timeout - resetting state");
+                isInitializing = false;
+                io.emit('whatsapp_status', { msg: 'Engine slow, please retry' });
+            }
+        }, 40000);
+
+        const { state, saveCreds } = await useMultiFileAuthState(authPath);
+        const { version } = await fetchLatestBaileysVersion().catch(() => ({ version: [2, 3000, 1015901307] }));
 
         whatsappClient = makeWASocket({
             version,
-            printQRInTerminal: false,
+            printQRInTerminal: true, // Also print in terminal for debugging
             auth: {
                 creds: state.creds,
                 keys: makeCacheableSignalKeyStore(state.keys, pino({ level: 'silent' })),
             },
             logger: pino({ level: 'silent' }),
-            browser: Browsers.macOS('Desktop'), // More stable than default
+            browser: Browsers.macOS('Desktop'),
             syncFullHistory: false,
             markOnlineOnConnect: true,
+            connectTimeoutMs: 60000,
+            defaultQueryTimeoutMs: 0,
+            keepAliveIntervalMs: 10000,
         });
 
         whatsappClient.ev.on('creds.update', saveCreds);
@@ -100,6 +120,7 @@ const initializeWhatsApp = async (userId) => {
             const { connection, lastDisconnect, qr } = update;
 
             if (qr) {
+                clearTimeout(timeout);
                 console.log("✅ QR Code Generated.");
                 io.emit('whatsapp_status', { msg: 'QR Code Ready! Scan now.' });
                 lastQR = await qrcode.toDataURL(qr);
@@ -107,8 +128,11 @@ const initializeWhatsApp = async (userId) => {
             }
 
             if (connection === 'close') {
-                const shouldReconnect = (lastDisconnect?.error)?.output?.statusCode !== DisconnectReason.loggedOut;
-                console.log('🔌 Connection closed due to ', lastDisconnect?.error, ', reconnecting ', shouldReconnect);
+                clearTimeout(timeout);
+                const statusCode = (lastDisconnect?.error)?.output?.statusCode;
+                const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
+                
+                console.log(`🔌 Connection closed. Status: ${statusCode}, Reconnect: ${shouldReconnect}`);
                 
                 isInitializing = false;
                 whatsappClient = null;
@@ -116,9 +140,14 @@ const initializeWhatsApp = async (userId) => {
                 io.emit('whatsapp_disconnected');
 
                 if (shouldReconnect) {
+                    console.log("🔄 Attempting to reconnect...");
                     initializeWhatsApp(userId);
+                } else {
+                    console.log("❌ Logged out. Deleting session folder...");
+                    fs.rmSync(authPath, { recursive: true, force: true });
                 }
             } else if (connection === 'open') {
+                clearTimeout(timeout);
                 console.log('🚀 WhatsApp Client is Ready and Connected!');
                 io.emit('whatsapp_status', { msg: 'WhatsApp is Ready!' });
                 isInitializing = false;
