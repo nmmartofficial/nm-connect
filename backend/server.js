@@ -798,31 +798,25 @@ const startCampaign = async (userId, contacts, messages, media, poll, startIndex
                 progress: { current: i + 1, total: contacts.length, sent: sentCount, invalid: invalidCount, lastIndex: i }
             });
 
-            // E. --- THE CHAOS DELAY LOGIC (ZERO PATTERNS) ---
+            // E. --- OPTIMIZED FAST DELAY LOGIC ---
             let delay;
             const seed = Math.random();
-            const clusterSize = Math.floor(Math.random() * 4) + 2; // Cluster size 2 to 5
+            const clusterSize = Math.floor(Math.random() * 6) + 5; // Cluster size 5 to 10
 
-            // 1. Cluster Break: After sending a few messages, take a random "distraction" break
+            // 1. Cluster Break: After sending more messages, take a shorter break
             if (sentCount % clusterSize === 0) {
-                const clusterBreak = Math.floor(Math.random() * (120000 - 40000 + 1)) + 40000;
+                const clusterBreak = Math.floor(Math.random() * (60000 - 20000 + 1)) + 20000;
                 delay = clusterBreak;
-                console.log(`☕ Cluster break: ${delay/1000}s...`);
+                console.log(`☕ Quick break: ${delay/1000}s...`);
             } 
-            // 2. The "Phone Lock" Break (10% chance, 3-7 minutes)
-            else if (seed < 0.10) {
-                delay = Math.floor(Math.random() * (420000 - 180000 + 1)) + 180000;
-                console.log(`📱 Phone Locked: ${delay/1000}s break...`);
+            // 2. The "Phone Lock" Break (Reduced to 5% chance, 2-4 minutes)
+            else if (seed < 0.05) {
+                delay = Math.floor(Math.random() * (240000 - 120000 + 1)) + 120000;
+                console.log(`📱 Shorter Phone Lock: ${delay/1000}s break...`);
             }
-            // 3. Variable Base Delay (25-75s)
+            // 3. Optimized Base Delay (10-25s)
             else {
-                delay = Math.floor(Math.random() * (75000 - 25000 + 1)) + 25000;
-            }
-
-            // 4. Global Hourly Slowdown (Sometimes we just get slow)
-            if (Math.random() < 0.05) {
-                delay += 300000; // Extra 5 min random lag
-                console.log(`🐌 Unexpected human lag: +300s`);
+                delay = Math.floor(Math.random() * (25000 - 10000 + 1)) + 10000;
             }
 
             console.log(`⏳ Next in ${delay/1000}s...`);
