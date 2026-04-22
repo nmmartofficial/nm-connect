@@ -557,6 +557,8 @@ app.post('/api/send-bulk', async (req, res) => {
 // --- PLAN CHECKING LOGIC ---
     let plan = 'Free';
     let limit = 50;
+    let isAdmin = false;
+    const normalizedBodyEmail = (bodyEmail || '').toLowerCase().trim();
     
     // 1. Database Check (Now with 3-day Free Trial Logic)
     try {
@@ -602,7 +604,7 @@ app.post('/api/send-bulk', async (req, res) => {
         }
 
         const dbEmail = (userData?.email || '').toLowerCase().trim();
-        isAdmin = dbEmail === 'nmmart07@gmail.com' || dbEmail === 'abduls9125@gmail.com' || userId === '56733041-8c04-4a55-bb82-8030e739297d';
+        isAdmin = dbEmail === 'nmmart07@gmail.com' || dbEmail === 'abduls9125@gmail.com' || userId === '56733041-8c04-4a55-bb82-8030e739297d' || normalizedBodyEmail === 'nmmart07@gmail.com' || normalizedBodyEmail === 'abduls9125@gmail.com';
     } catch (err) {
         console.error("⚠️ Supabase User Logic Failed:", err.message);
     }
