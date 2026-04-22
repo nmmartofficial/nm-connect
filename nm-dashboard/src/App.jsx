@@ -54,7 +54,15 @@ export default function App() {
       alert("Please fill product name and sale price");
       return;
     }
-    const { error } = await supabase.from('inventory').insert([{ ...newInventory, user_id: USER_ID }]);
+    // Mapping product_name to item_name to match your existing database column
+    const { error } = await supabase.from('inventory').insert([{ 
+      item_name: newInventory.product_name, 
+      mrp: newInventory.mrp,
+      sale_price: newInventory.sale_price,
+      discount: newInventory.discount,
+      user_id: USER_ID 
+    }]);
+    
     if (!error) {
       setNewInventory({ product_name: '', mrp: '', sale_price: '', discount: '' });
       fetchInventory();
@@ -82,19 +90,19 @@ export default function App() {
         const rows = text.split('\n').filter(row => row.trim() !== '');
         
         // Skip header if it exists
-        const dataRows = rows[0].toLowerCase().includes('product') ? rows.slice(1) : rows;
+        const dataRows = rows[0].toLowerCase().includes('product') || rows[0].toLowerCase().includes('item') ? rows.slice(1) : rows;
         
         const items = dataRows.map(row => {
           const parts = row.split(',');
           if (parts.length < 2) return null;
           return {
             user_id: USER_ID,
-            product_name: parts[0]?.trim(),
+            item_name: parts[0]?.trim(), // Using item_name instead of product_name
             mrp: parseFloat(parts[1]) || 0,
             sale_price: parseFloat(parts[2]) || 0,
             discount: parseFloat(parts[3]) || 0
           };
-        }).filter(item => item && item.product_name);
+        }).filter(item => item && item.item_name);
 
         if (items.length === 0) throw new Error("No valid products found in file.");
 
@@ -1122,7 +1130,7 @@ export default function App() {
                                 <tbody className="divide-y divide-slate-800/50">
                                     {inventory.length > 0 ? inventory.map((p, i) => (
                                         <tr key={i} className="hover:bg-slate-800/30 transition-colors group text-sm">
-                                            <td className="p-4 font-bold text-slate-200">{p.product_name}</td>
+                                            <td className="p-4 font-bold text-slate-200">{p.item_name}</td>
                                             <td className="p-4 text-slate-400">₹{p.mrp}</td>
                                             <td className="p-4 text-green-500 font-bold">₹{p.sale_price}</td>
                                             <td className="p-4 text-blue-500 font-bold">{p.discount}% OFF</td>

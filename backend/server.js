@@ -327,23 +327,23 @@ const initializeWhatsApp = async (userId) => {
                             .from('inventory')
                             .select('*')
                             .eq('user_id', userId)
-                            .ilike('product_name', `%${incomingMsg}%`)
+                            .ilike('item_name', `%${incomingMsg}%`) // Using item_name to match DB column
                             .limit(1);
 
                         if (products && products.length > 0) {
                             const p = products[0];
                             matched = true;
-                            const reply = `🛍️ *Product Found:* ${p.product_name}\n\n` +
+                            const reply = `🛍️ *Product Found:* ${p.item_name}\n\n` +
                                           `💰 *MRP:* ₹${p.mrp}\n` +
                                           `🔥 *Sale Price:* ₹${p.sale_price}\n` +
                                           `🏷️ *Discount:* ${p.discount}% OFF\n\n` +
                                           `✅ *Status:* ${p.stock_status || 'In Stock'}\n\n` +
                                           `_NM Mart - Best Prices Always!_`;
 
-                            console.log(`📦 Inventory Match: ${p.product_name}`);
+                            console.log(`📦 Inventory Match: ${p.item_name}`);
                             await new Promise(r => setTimeout(r, Math.random() * 2000 + 1000));
                             await client.sendMessage(from, { text: reply });
-                            io.emit(`log_${userId}`, { type: 'info', msg: `📦 Inventory Bot: Sent details for ${p.product_name}` });
+                            io.emit(`log_${userId}`, { type: 'info', msg: `📦 Inventory Bot: Sent details for ${p.item_name}` });
                         }
                     } catch (invErr) {
                         console.error("⚠️ Inventory Search Error:", invErr.message);
