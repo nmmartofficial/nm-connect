@@ -466,7 +466,7 @@ export default function App() {
           onStatusChange={setIsWhatsAppReady} 
         />
 
-        <nav className="space-y-2 mt-8 flex-1">
+        <nav className="space-y-2 mt-8 flex-1 overflow-y-auto custom-scrollbar pr-2">
           <button onClick={() => setActiveTab('dashboard')} className={`w-full flex items-center gap-3 p-3 rounded-xl font-bold transition-all ${activeTab === 'dashboard' ? 'bg-blue-600 text-white' : 'hover:bg-slate-800 text-slate-400'}`}>
             <LayoutDashboard size={18}/> Dashboard
           </button>
