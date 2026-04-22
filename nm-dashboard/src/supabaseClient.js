@@ -10,4 +10,12 @@ if (!supabaseUrl || !supabaseAnonKey) {
   console.log("✅ Using Key:", supabaseAnonKey.substring(0, 15) + "...");
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: true,
+    storage: window.localStorage,
+    storageKey: 'nm-connect-auth-session'
+  }
+});

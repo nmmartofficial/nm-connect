@@ -5,6 +5,7 @@ import { Zap, ShieldCheck, ShoppingCart, TrendingUp, MessageSquare, Coins } from
 export default function Login({ onLoginSuccess }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [rememberMe, setRememberMe] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
@@ -14,6 +15,11 @@ export default function Login({ onLoginSuccess }) {
     setError(null);
     console.log("Attempting login with:", email);
     try {
+      // Configure auth session persistence based on rememberMe
+      if (!rememberMe) {
+        await supabase.auth.setSession({ persistSession: false });
+      }
+
       const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) {
         console.error("Login error:", error.message);
@@ -87,6 +93,19 @@ export default function Login({ onLoginSuccess }) {
                 placeholder="••••••••"
                 required
               />
+            </div>
+
+            <div className="flex items-center gap-2 px-1">
+              <input 
+                type="checkbox" 
+                id="rememberMe"
+                checked={rememberMe}
+                onChange={(e) => setRememberMe(e.target.checked)}
+                className="w-4 h-4 bg-slate-900 border-slate-800 rounded focus:ring-blue-600 accent-blue-600"
+              />
+              <label htmlFor="rememberMe" className="text-[10px] font-black text-slate-500 uppercase tracking-widest cursor-pointer">
+                Stay logged in (Admin)
+              </label>
             </div>
 
             {error && (
