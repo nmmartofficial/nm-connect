@@ -5,7 +5,7 @@ import {
   Users, Send, TrendingUp, Upload, Database, 
   Search, Filter, Phone, MessageSquare, ShieldCheck, Zap, 
   ListChecks, Clock, XCircle, Trash2, RefreshCcw, Image as ImageIcon, LogOut, Menu, X,
-  CheckCircle2, AlertCircle, History as HistoryIcon, LayoutDashboard, Settings, CreditCard, Star, Crown, Bot, Plus
+  CheckCircle2, AlertCircle, History as HistoryIcon, LayoutDashboard, Settings, CreditCard, Star, Crown, Bot, Plus, FileUp
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import SessionManager from './SessionManager'; 
