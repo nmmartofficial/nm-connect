@@ -3,34 +3,65 @@ import { supabase } from '../supabaseClient';
 import { Zap, ShieldCheck, ShoppingCart, TrendingUp, MessageSquare, Coins } from 'lucide-react';
 
 export default function Login({ onLoginSuccess }) {
+  const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [businessName, setBusinessName] = useState('');
   const [rememberMe, setRememberMe] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  const handleLogin = async (e) => {
+  const handleAuth = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
-    console.log("Attempting login with:", email);
+    
     try {
-      // Configure auth session persistence based on rememberMe
       if (!rememberMe) {
         await supabase.auth.setSession({ persistSession: false });
       }
 
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) {
-        console.error("Login error:", error.message);
-        setError(error.message);
-      } else {
-        console.log("Login success:", data.user);
+      if (isLogin) {
+        // LOGIN LOGIC
+        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+        if (error) throw error;
         onLoginSuccess(data.user);
+      } else {
+        // SIGNUP LOGIC
+        const { data, error } = await supabase.auth.signUp({ 
+          email, 
+          password,
+          options: {
+            data: {
+              business_name: businessName
+            }
+          }
+        });
+        
+        if (error) throw error;
+
+        if (data.user) {
+          // Manually create the user record in 'users' table if it doesn't exist
+          // (Though usually handled by a trigger, this ensures data is there for your plan logic)
+          const trialExpiry = new Date();
+          trialExpiry.setDate(trialExpiry.getDate() + 3);
+
+          await supabase.from('users').upsert({
+            id: data.user.id,
+            email: email.toLowerCase(),
+            business_name: businessName,
+            plan_name: 'Trial',
+            daily_limit: 100,
+            trial_expires_at: trialExpiry.toISOString()
+          });
+
+          alert("Signup successful! You can now login.");
+          setIsLogin(true);
+        }
       }
     } catch (err) {
-      console.error("Unexpected error during login:", err);
-      setError("Network Error: " + (err.message || "Failed to fetch"));
+      console.error("Auth error:", err.message);
+      setError(err.message);
     } finally {
       setLoading(false);
     }
@@ -66,11 +97,25 @@ export default function Login({ onLoginSuccess }) {
           </div>
 
           <div className="mb-8 text-center md:text-left">
-             <h3 className="text-xl font-black text-white mb-1">Welcome Back</h3>
-             <p className="text-slate-500 font-medium uppercase text-[10px] tracking-widest">Admin Access Only</p>
+             <h3 className="text-xl font-black text-white mb-1">{isLogin ? "Welcome Back" : "Create Account"}</h3>
+             <p className="text-slate-500 font-medium uppercase text-[10px] tracking-widest">{isLogin ? "Admin & User Access" : "Get Started with NM Connect"}</p>
           </div>
 
-          <form onSubmit={handleLogin} className="space-y-4">
+          <form onSubmit={handleAuth} className="space-y-4">
+            {!isLogin && (
+              <div>
+                <label className="block text-[10px] font-black text-slate-500 uppercase mb-2 tracking-widest">Business / Store Name</label>
+                <input 
+                  type="text" 
+                  value={businessName} 
+                  onChange={(e) => setBusinessName(e.target.value)}
+                  className="w-full bg-slate-900 border border-slate-800 rounded-xl p-3.5 text-white font-bold text-sm focus:outline-none focus:border-blue-600 transition-all"
+                  placeholder="e.g. NM Mart"
+                  required
+                />
+              </div>
+            )}
+            
             <div>
               <label className="block text-[10px] font-black text-slate-500 uppercase mb-2 tracking-widest">Email</label>
               <input 
@@ -78,7 +123,7 @@ export default function Login({ onLoginSuccess }) {
                 value={email} 
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full bg-slate-900 border border-slate-800 rounded-xl p-3.5 text-white font-bold text-sm focus:outline-none focus:border-blue-600 transition-all"
-                placeholder="admin@nm-connect.com"
+                placeholder="you@example.com"
                 required
               />
             </div>
@@ -104,12 +149,12 @@ export default function Login({ onLoginSuccess }) {
                 className="w-4 h-4 bg-slate-900 border-slate-800 rounded focus:ring-blue-600 accent-blue-600"
               />
               <label htmlFor="rememberMe" className="text-[10px] font-black text-slate-500 uppercase tracking-widest cursor-pointer">
-                Stay logged in (Admin)
+                Stay logged in
               </label>
             </div>
 
             {error && (
-              <div className="text-red-400 text-[10px] font-bold text-center">
+              <div className="text-red-400 text-[10px] font-bold text-center bg-red-400/10 py-2 rounded-lg border border-red-400/20">
                  ⚠️ {error}
               </div>
             )}
@@ -119,8 +164,21 @@ export default function Login({ onLoginSuccess }) {
               disabled={loading}
               className="w-full bg-blue-600 hover:bg-blue-500 text-white font-black uppercase py-4 rounded-xl shadow-lg transition-all active:scale-95 text-xs tracking-widest"
             >
-              {loading ? "..." : "Launch Dashboard"}
+              {loading ? "..." : (isLogin ? "Launch Dashboard" : "Register & Start Trial")}
             </button>
+
+            <div className="text-center mt-4">
+              <button 
+                type="button"
+                onClick={() => {
+                  setIsLogin(!isLogin);
+                  setError(null);
+                }}
+                className="text-[10px] font-black text-blue-500 hover:text-blue-400 uppercase tracking-widest transition-all"
+              >
+                {isLogin ? "Don't have an account? Sign Up" : "Already have an account? Login"}
+              </button>
+            </div>
           </form>
         </div>
       </div>
