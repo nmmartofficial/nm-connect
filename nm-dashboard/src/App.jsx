@@ -697,45 +697,49 @@ export default function App() {
                                     </div>
 
                                     <div className="flex flex-col md:flex-row gap-3">
-                                        {loading ? (
+                                        {activeCampaignId ? (
                                             <div className="flex-1 flex gap-2">
-                                              <button 
-                                                  onClick={stopCampaign} 
-                                                  className="flex-1 bg-red-600 hover:bg-red-700 text-white py-4 rounded-xl font-black uppercase tracking-widest transition-all shadow-lg shadow-red-500/20 flex items-center justify-center gap-2"
-                                              >
-                                                  <XCircle size={20}/> Stop
-                                              </button>
-                                              <button 
-                                                  onClick={async () => {
-                                                      if(window.confirm("Force reset will clear all stuck states. Use this if 'Stop' doesn't work.")) {
-                                                          await stopCampaign();
-                                                          setLoading(false);
-                                                          setActiveCampaignId(null);
-                                                      }
-                                                  }} 
-                                                  className="bg-slate-800 hover:bg-slate-700 text-slate-400 px-4 rounded-xl font-bold transition-all border border-slate-700"
-                                                  title="Force Reset"
-                                              >
-                                                  <RefreshCcw size={16}/>
-                                              </button>
+                                                <button 
+                                                    onClick={stopCampaign} 
+                                                    className="flex-1 bg-red-600 hover:bg-red-700 text-white py-4 rounded-xl font-black uppercase tracking-widest transition-all shadow-lg shadow-red-500/20 flex items-center justify-center gap-2"
+                                                >
+                                                    <XCircle size={20} className="animate-pulse"/> Stop Campaign
+                                                </button>
+                                                <button 
+                                                    onClick={async () => {
+                                                        if(window.confirm("Force reset will clear all stuck states. Use this if 'Stop' doesn't work.")) {
+                                                            await stopCampaign();
+                                                            setLoading(false);
+                                                            setActiveCampaignId(null);
+                                                        }
+                                                    }} 
+                                                    className="bg-slate-800 hover:bg-slate-700 text-slate-400 px-4 rounded-xl font-bold transition-all border border-slate-700"
+                                                    title="Force Reset"
+                                                >
+                                                    <RefreshCcw size={16}/>
+                                                </button>
                                             </div>
+                                        ) : loading ? (
+                                            <button disabled className="flex-1 bg-slate-800 text-slate-500 py-4 rounded-xl font-black uppercase tracking-widest text-sm flex items-center justify-center gap-3 cursor-not-allowed border border-slate-700">
+                                                <div className="w-4 h-4 border-2 border-slate-600 border-t-white rounded-full animate-spin"></div> Processing...
+                                            </button>
                                         ) : (
                                             <>
                                                 <button 
                                                     onClick={() => triggerCampaign(0)} 
-                                                    disabled={loading || !isWhatsAppReady}
-                                                    className="flex-1 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed text-white py-4 rounded-xl font-black uppercase tracking-widest transition-all border border-slate-700"
+                                                    disabled={!isWhatsAppReady}
+                                                    className={`flex-1 ${isWhatsAppReady ? 'bg-blue-600 hover:bg-blue-700 shadow-blue-500/20' : 'bg-slate-800 opacity-50 cursor-not-allowed'} text-white py-4 rounded-xl font-black uppercase tracking-widest transition-all shadow-lg flex items-center justify-center gap-2`}
                                                 >
-                                                    Start from Beginning
+                                                    <Send size={18}/> {scheduledTime ? 'Schedule Campaign' : 'Start Campaign'}
                                                 </button>
                                                 
-                                                {campaignProgress.lastIndex > -1 && (
+                                                {campaignProgress.total > 0 && campaignProgress.current < campaignProgress.total && (
                                                     <button 
-                                                        onClick={() => triggerCampaign(campaignProgress.lastIndex + 1)} 
-                                                        disabled={loading || !isWhatsAppReady}
-                                                        className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white py-4 rounded-xl font-black uppercase tracking-widest transition-all shadow-lg shadow-blue-500/20"
+                                                        onClick={() => triggerCampaign(campaignProgress.current)} 
+                                                        disabled={!isWhatsAppReady}
+                                                        className="flex-1 bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed text-white py-4 rounded-xl font-black uppercase tracking-widest transition-all shadow-lg shadow-green-500/20 flex items-center justify-center gap-2"
                                                     >
-                                                        Resume from #{campaignProgress.lastIndex + 2}
+                                                        <RefreshCcw size={16}/> Resume from #{campaignProgress.current + 1}
                                                     </button>
                                                 )}
                                             </>
