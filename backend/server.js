@@ -239,29 +239,28 @@ const initializeWhatsApp = async (userId) => {
                 let userIsAdmin = false;
 
                 try {
-                    console.log(`🔍 Checking DB for User ID: ${userId}`);
-                    // Removed 'email' from select because it doesn't exist in users table
-                    const { data: userData, error: dbError } = await supabase.from('users').select('plan_name').eq('id', userId).single();
+                    // Admin UUIDs (for nmmart07@gmail.com and abduls9125@gmail.com)
+                    const adminIds = [
+                        '56733041-8c04-4a55-bb82-8030e739297d', 
+                        '5998a41a-6415-4673-9a7c-403487333555'
+                    ];
                     
-                    if (dbError) {
-                        console.error("❌ Supabase DB Error:", dbError.message);
-                    }
+                    userIsAdmin = adminIds.includes(userId);
 
-                    // Since 'email' is not in the users table, we only use UUID for admin check
-                    userIsAdmin = userId === '56733041-8c04-4a55-bb82-8030e739297d' || 
-                                  userId === '5998a41a-6415-4673-9a7c-403487333555'; // Adding known admin IDs
-                    
+                    // Fetch plan from DB
+                    const { data: userData } = await supabase.from('users').select('plan_name').eq('id', userId).single();
                     userPlan = userData?.plan_name || 'Free';
                     
-                    console.log(`📊 Auth: ID=${userId}, Admin=${userIsAdmin}, Plan=${userPlan}`);
+                    console.log(`📊 Auth Check: ID=${userId} | Admin=${userIsAdmin} | Plan=${userPlan}`);
                 } catch (err) {
-                    console.error("⚠️ Error fetching user data:", err.message);
+                    console.error("⚠️ Auth Fetch Error:", err.message);
                 }
 
-                // ALLOW AI for ALL plans for now (Since you are testing)
-                // If you want to restrict it later, you can put the check back.
-                if (!userIsAdmin && userPlan === 'Blocked') { 
-                    console.log(`🚫 AI Blocked: User ${userId} is manually blocked.`);
+                // Permission: Admin OR Gold/Enterprise Plan
+                const hasPermission = userIsAdmin || userPlan === 'Gold' || userPlan === 'Enterprise';
+
+                if (!hasPermission) {
+                    console.log(`🚫 AI Blocked: No permission for ID ${userId} (Plan: ${userPlan})`);
                     continue;
                 }
 
