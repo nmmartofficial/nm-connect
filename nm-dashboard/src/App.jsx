@@ -5,7 +5,7 @@ import {
   Users, Send, TrendingUp, Upload, Database, 
   Search, Filter, Phone, MessageSquare, ShieldCheck, Zap, 
   ListChecks, Clock, XCircle, Trash2, RefreshCcw, Image as ImageIcon, LogOut, Menu, X,
-  CheckCircle2, AlertCircle, History as HistoryIcon, LayoutDashboard, Settings, CreditCard, Star, Crown
+  CheckCircle2, AlertCircle, History as HistoryIcon, LayoutDashboard, Settings, CreditCard, Star, Crown, Bot, Plus
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import SessionManager from './SessionManager'; 
@@ -235,6 +235,28 @@ export default function App() {
     };
   }, [USER_ID, socket]);
 
+  const handleMessageChange = (key, value) => {
+    setMessageVariations(prev => ({ ...prev, [key]: value }));
+  };
+
+  const [pollData, setPollData] = useState({ question: '', options: ['', ''] });
+
+  const handlePollChange = (field, value, index = null) => {
+    if (field === 'options') {
+      const newOptions = [...pollData.options];
+      newOptions[index] = value;
+      setPollData({ ...pollData, options: newOptions });
+    } else {
+      setPollData({ ...pollData, [field]: value });
+    }
+  };
+
+  const addPollOption = () => {
+    if (pollData.options.length < 5) {
+      setPollData({ ...pollData, options: [...pollData.options, ''] });
+    }
+  };
+
   const triggerCampaign = async (startIndex = 0) => {
     let targetList = customers;
     
@@ -244,7 +266,9 @@ export default function App() {
     }
 
     if (targetList.length === 0) return alert("No numbers to send!");
-    if (!messageVariations.A.trim()) return alert("Please enter a message!");
+    
+    const activeMessages = Object.values(messageVariations).filter(m => m.trim() !== "");
+    if (activeMessages.length === 0) return alert("Please enter at least one message variation!");
 
     console.log(`🌐 Triggering campaign at: ${BACKEND_URL}/api/send-bulk`);
 
@@ -268,10 +292,11 @@ export default function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           contacts: targetList, 
-          messages: [messageVariations.A], 
+          messages: activeMessages, // Sending all active variations
           userId: USER_ID,
-          userEmail: session?.user?.email, // Sending email for direct admin check
+          userEmail: session?.user?.email, 
           media: mediaData,
+          poll: pollData.question ? pollData : null, // Sending poll if exists
           startIndex: startIndex,
           scheduledAt: scheduledTime || null,
           campaignName: campaignName || `Campaign ${new Date().toLocaleDateString()}`,
@@ -436,8 +461,9 @@ export default function App() {
                 onClick={() => userPlan.name === 'Gold' || userPlan.name === 'Enterprise' ? setActiveTab('bot') : setActiveTab('billing')} 
                 className={`w-full flex items-center gap-3 p-3 rounded-xl font-bold transition-all ${activeTab === 'bot' ? 'bg-blue-600 text-white' : 'hover:bg-slate-800 text-slate-400'}`}
             >
-                <Zap size={18}/> Auto-Responder
+                <Bot size={18}/> AI Auto-Responder
                 {(userPlan.name !== 'Gold' && userPlan.name !== 'Enterprise') && <Crown size={12} className="ml-auto text-orange-500"/>}
+                {(userPlan.name === 'Gold' || userPlan.name === 'Enterprise') && <div className="ml-auto h-2 w-2 bg-green-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(34,197,94,0.6)]"></div>}
             </button>
           </div>
 
@@ -559,15 +585,27 @@ export default function App() {
                                     </div>
 
                                     <div className="flex justify-between items-center text-[10px] font-bold text-slate-500 uppercase tracking-widest">
-                                        <span>Business Message Template</span>
-                                        <span className="text-blue-500 lowercase normal-case italic">Auto-generates professional Ref Code</span>
+                                        <span>Message Templates (A/B/C Rotation)</span>
+                                        <span className="text-blue-500 lowercase normal-case italic">Rotates variations to bypass AI filters</span>
                                     </div>
-                                    <textarea 
-                                        value={messageVariations.A} 
-                                        onChange={(e) => setMessageVariations({ A: e.target.value })} 
-                                        placeholder="Dear {name}, &#10;{Greetings|Hello}! We have a special {offer|discount} just for you. &#10;Visit us today!" 
-                                        className="w-full h-48 bg-slate-950 border border-slate-800 rounded-xl p-4 text-slate-300 focus:border-blue-500 outline-none transition-all resize-none"
-                                    />
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                        {['A', 'B', 'C'].map((label) => (
+                                            <div key={label} className="space-y-2 group">
+                                                <div className="flex items-center justify-between">
+                                                    <span className="text-[9px] font-black uppercase text-slate-600 group-hover:text-blue-500 transition-colors">
+                                                        Variation {label}
+                                                    </span>
+                                                    {label === 'A' && <span className="text-[8px] text-blue-500 font-bold uppercase">Primary</span>}
+                                                </div>
+                                                <textarea 
+                                                    value={messageVariations[label]} 
+                                                    onChange={(e) => handleMessageChange(label, e.target.value)} 
+                                                    placeholder={label === 'A' ? "Message A..." : `Optional ${label}...`} 
+                                                    className={`w-full h-32 bg-slate-950 border border-slate-800 rounded-xl p-3 text-slate-300 focus:border-blue-500 outline-none transition-all resize-none text-[11px] leading-relaxed ${!messageVariations[label] && label !== 'A' ? 'opacity-50 hover:opacity-100' : ''}`}
+                                                />
+                                            </div>
+                                        ))}
+                                    </div>
 
                                     {/* PROGRESS BAR */}
                                     {campaignProgress.total > 0 && (
@@ -612,6 +650,42 @@ export default function App() {
                                             <p className="text-[10px] text-blue-500 font-bold italic">
                                                 * Campaign will start automatically at {new Date(scheduledTime).toLocaleString()}
                                             </p>
+                                        )}
+                                    </div>
+
+                                    {/* INTERACTIVE POLL (OPTIONAL) */}
+                                    <div className="p-4 rounded-xl bg-slate-900/50 border border-slate-800 space-y-4">
+                                        <div className="flex items-center gap-2 text-[10px] font-black uppercase text-slate-500">
+                                            <ListChecks size={14}/> Add Interactive Poll (Boosts Engagement)
+                                        </div>
+                                        <input 
+                                            type="text" 
+                                            placeholder="Poll Question (e.g. Do you like our offers?)" 
+                                            className="w-full bg-slate-950 border border-slate-800 rounded-lg p-3 text-xs outline-none focus:border-blue-500 transition-all"
+                                            value={pollData.question}
+                                            onChange={(e) => handlePollChange('question', e.target.value)}
+                                        />
+                                        {pollData.question && (
+                                            <div className="grid grid-cols-2 gap-2">
+                                                {pollData.options.map((opt, i) => (
+                                                    <input 
+                                                        key={i}
+                                                        type="text" 
+                                                        placeholder={`Option ${i+1}`} 
+                                                        className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-[10px] outline-none focus:border-blue-500 transition-all"
+                                                        value={opt}
+                                                        onChange={(e) => handlePollChange('options', e.target.value, i)}
+                                                    />
+                                                ))}
+                                                {pollData.options.length < 5 && (
+                                                    <button 
+                                                        onClick={addPollOption}
+                                                        className="col-span-2 text-[9px] font-bold text-blue-500 uppercase hover:text-blue-400 transition-colors py-1"
+                                                    >
+                                                        + Add Option
+                                                    </button>
+                                                )}
+                                            </div>
                                         )}
                                     </div>
 

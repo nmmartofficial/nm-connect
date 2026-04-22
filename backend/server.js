@@ -16,8 +16,13 @@ const cors = require('cors');
 const { createClient } = require('@supabase/supabase-js');
 const fs = require('fs');
 const { join } = require('path');
+const { GoogleGenerativeAI } = require("@google/generative-ai");
 
 const app = express();
+
+// Initialize Gemini
+const genAI = process.env.GEMINI_API_KEY ? new GoogleGenerativeAI(process.env.GEMINI_API_KEY) : null;
+const aiModel = genAI ? genAI.getGenerativeModel({ model: "gemini-1.5-flash" }) : null;
 
 const allowedOrigins = [
     "http://localhost:5173",
@@ -237,6 +242,34 @@ const initializeWhatsApp = async (userId) => {
                             type: 'info', 
                             msg: `🤖 Bot: Auto-replied to ${from.split('@')[0]} (Keyword: ${matchedResponse.keyword})` 
                         });
+                        continue; // Skip AI if keyword matched
+                    }
+                }
+
+                // 3. Smart AI Reply (Gemini) - Fallback if no keyword matches
+                if (aiModel) {
+                    try {
+                        console.log(`🧠 AI Bot: Thinking of a reply for ${from.split('@')[0]}...`);
+                        
+                        // Human-like thinking delay
+                        await new Promise(r => setTimeout(r, Math.random() * 5000 + 3000));
+                        
+                        const prompt = `You are a helpful business assistant for a company called NM Connect. 
+                        A customer just messaged: "${body}". 
+                        Reply politely and concisely in the same language as the customer. 
+                        Keep it under 30 words. If you don't know the answer, ask them to wait for a human representative.`;
+
+                        const result = await aiModel.generateContent(prompt);
+                        const aiReply = result.response.text();
+
+                        await whatsappClient.sendMessage(from, { text: aiReply });
+                        
+                        io.emit(`log_${userId}`, { 
+                            type: 'info', 
+                            msg: `🧠 AI Bot: Replied to ${from.split('@')[0]} using Gemini` 
+                        });
+                    } catch (aiErr) {
+                        console.error("❌ Gemini AI Error:", aiErr.message);
                     }
                 }
             }
@@ -325,7 +358,7 @@ app.post('/api/reset-session', async (req, res) => {
 });
 
 app.post('/api/send-bulk', async (req, res) => {
-    const { contacts, messages, userId, userEmail: bodyEmail, media, startIndex = 0, campaignName = 'General Campaign', scheduledAt = null, campaignId = null } = req.body;
+    const { contacts, messages, userId, userEmail: bodyEmail, media, poll, startIndex = 0, campaignName = 'General Campaign', scheduledAt = null, campaignId = null } = req.body;
     
     // --- CHECK IF ALREADY RUNNING ---
     if (!scheduledAt) {
@@ -444,11 +477,11 @@ app.post('/api/send-bulk', async (req, res) => {
     runningCampaigns.set(userId, true);
     res.json({ status: "Campaign Started", startIndex, campaignId: activeCampaignId });
 
-    startCampaign(userId, contacts, messages, media, startIndex, activeCampaignId);
+    startCampaign(userId, contacts, messages, media, poll, startIndex, activeCampaignId);
 });
 
 // Extracted Campaign Logic for Reusability (Scheduling)
-const startCampaign = async (userId, contacts, messages, media, startIndex, campaignId) => {
+const startCampaign = async (userId, contacts, messages, media, poll, startIndex, campaignId) => {
     let mediaBuffer = null;
     let mediaType = null;
     
@@ -570,6 +603,15 @@ const startCampaign = async (userId, contacts, messages, media, startIndex, camp
                 sendMsg.caption = finalMsg;
                 if (mediaType === 'document') sendMsg.fileName = media.filename || 'document';
                 await whatsappClient.sendMessage(chatId, sendMsg);
+            } else if (poll && poll.question && Math.random() > 0.5) {
+                // Send Poll occasionally (50% chance if it exists)
+                await whatsappClient.sendMessage(chatId, {
+                    poll: {
+                        name: poll.question,
+                        values: poll.options.filter(o => o.trim() !== ''),
+                        selectableCount: 1
+                    }
+                });
             } else {
                 await whatsappClient.sendMessage(chatId, { text: finalMsg });
             }
