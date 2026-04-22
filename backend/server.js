@@ -798,28 +798,31 @@ const startCampaign = async (userId, contacts, messages, media, poll, startIndex
                 progress: { current: i + 1, total: contacts.length, sent: sentCount, invalid: invalidCount, lastIndex: i }
             });
 
-            // E. --- OPTIMIZED FAST DELAY LOGIC ---
+            // E. --- CHAOTIC HUMAN SIMULATION (ZERO PATTERNS) ---
             let delay;
-            const seed = Math.random();
-            const clusterSize = Math.floor(Math.random() * 6) + 5; // Cluster size 5 to 10
+            const luck = Math.random();
 
-            // 1. Cluster Break: After sending more messages, take a shorter break
-            if (sentCount % clusterSize === 0) {
-                const clusterBreak = Math.floor(Math.random() * (60000 - 20000 + 1)) + 20000;
-                delay = clusterBreak;
-                console.log(`☕ Quick break: ${delay/1000}s...`);
+            // 1. Random "Distraction" Break (8% chance - Someone called or opened another app)
+            if (luck < 0.08) {
+                delay = Math.floor(Math.random() * (180000 - 45000 + 1)) + 45000;
+                console.log(`☕ Human Distraction: ${Math.round(delay/1000)}s break...`);
             } 
-            // 2. The "Phone Lock" Break (Reduced to 5% chance, 2-4 minutes)
-            else if (seed < 0.05) {
-                delay = Math.floor(Math.random() * (240000 - 120000 + 1)) + 120000;
-                console.log(`📱 Shorter Phone Lock: ${delay/1000}s break...`);
+            // 2. Quick "Micro-Break" (15% chance - Just checking notification)
+            else if (luck < 0.23) {
+                delay = Math.floor(Math.random() * (40000 - 15000 + 1)) + 15000;
+                console.log(`⏱️ Micro-pause: ${Math.round(delay/1000)}s...`);
             }
-            // 3. Optimized Base Delay (10-25s)
+            // 3. Normal Human Flow (77% chance)
             else {
-                delay = Math.floor(Math.random() * (25000 - 10000 + 1)) + 10000;
+                // Base delay between 8 to 22 seconds
+                delay = Math.floor(Math.random() * (22000 - 8000 + 1)) + 8000;
             }
 
-            console.log(`⏳ Next in ${delay/1000}s...`);
+            // D. Randomized "Post-Send" Thinking (Wait a bit after sending)
+            const postSendThink = Math.floor(Math.random() * 3000 + 500);
+            await new Promise(r => setTimeout(r, postSendThink));
+
+            console.log(`⏳ Next message in ${Math.round((delay + postSendThink)/1000)}s...`);
             await new Promise(r => setTimeout(r, delay));
    
         } catch (err) {
