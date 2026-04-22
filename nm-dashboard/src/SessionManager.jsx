@@ -111,47 +111,46 @@ export default function SessionManager({ userId, socket, backendUrl, onStatusCha
   };
 
   return (
-    <div className="bg-slate-900/90 p-5 rounded-[2rem] border border-slate-800 mb-6 text-center shadow-2xl">
-      <div className="flex justify-between items-center mb-4">
-        <p className="text-[9px] font-black text-slate-600 uppercase tracking-[0.2em]">WhatsApp Status</p>
-        <div className={`h-2 w-2 rounded-full ${status.includes('✅') ? 'bg-green-500' : 'bg-orange-500 animate-pulse'}`}></div>
+    <div className="bg-slate-950/40 p-4 rounded-2xl border border-slate-800/50 text-center shadow-xl">
+      <div className="flex justify-between items-center mb-3">
+        <p className="text-[8px] font-black text-slate-600 uppercase tracking-widest">WhatsApp Status</p>
+        <div className={`h-1.5 w-1.5 rounded-full ${status.includes('✅') ? 'bg-green-500 shadow-[0_0_5px_rgba(34,197,94,0.6)]' : 'bg-orange-500 animate-pulse'}`}></div>
       </div>
 
-      <div className="flex flex-col items-center justify-center min-h-[180px]">
+      <div className="flex flex-col items-center justify-center min-h-[100px]">
         {loading && !qrCode ? (
-          <div className="flex flex-col items-center gap-3">
-            <div className="w-8 h-8 border-2 border-blue-500/10 border-t-blue-500 rounded-full animate-spin"></div>
-            <p className="text-[10px] text-slate-500 font-bold uppercase">{status}</p>
+          <div className="flex flex-col items-center gap-2">
+            <div className="w-6 h-6 border-2 border-blue-500/10 border-t-blue-500 rounded-full animate-spin"></div>
+            <p className="text-[9px] text-slate-500 font-bold uppercase">{status}</p>
           </div>
         ) : qrCode ? (
           <div className="animate-in fade-in zoom-in duration-500">
-            <div className="bg-white p-3 rounded-2xl shadow-2xl border-4 border-slate-950">
-              <img src={qrCode} alt="WhatsApp QR" className="w-[160px] h-[160px]" />
+            <div className="bg-white p-2 rounded-xl shadow-2xl">
+              <img src={qrCode} alt="WhatsApp QR" className="w-[110px] h-[110px]" />
             </div>
-            <p className="mt-4 text-[10px] font-black text-blue-400 uppercase tracking-tighter">Scan with WhatsApp</p>
             <button 
                 onClick={handleResetEngine}
-                className="mt-4 text-[9px] text-red-500/50 hover:text-red-500 font-bold uppercase transition-colors"
+                className="mt-2 text-[8px] text-red-500/50 hover:text-red-500 font-bold uppercase transition-colors"
             >
-                Reset & Try Again
+                Reset QR
             </button>
           </div>
         ) : (
-          <div className="py-4 px-6 bg-slate-950/50 rounded-2xl border border-slate-800/50">
-            <p className={`text-xs font-black uppercase tracking-widest ${status.includes('✅') ? 'text-green-400' : 'text-slate-400'}`}>
+          <div className="w-full py-3 px-4 bg-slate-950/30 rounded-xl border border-slate-800/30">
+            <p className={`text-[10px] font-black uppercase tracking-wider ${status.includes('✅') ? 'text-green-400' : 'text-slate-500'}`}>
               {status}
             </p>
             {!status.includes('✅') && (
-              <div className="flex flex-col gap-2 mt-3">
+              <div className="flex flex-col gap-1.5 mt-2">
                 <button 
                   onClick={handleManualReconnect}
-                  className="text-[10px] text-blue-500 hover:text-blue-400 font-bold uppercase underline"
+                  className="text-[9px] text-blue-500 hover:text-blue-400 font-bold uppercase underline"
                 >
-                  Reconnect Now
+                  Reconnect
                 </button>
                 <button 
                   onClick={handleResetEngine}
-                  className="text-[9px] text-slate-600 hover:text-red-500 font-bold uppercase"
+                  className="text-[8px] text-slate-700 hover:text-red-500 font-bold uppercase"
                 >
                   Reset Engine
                 </button>
@@ -160,9 +159,9 @@ export default function SessionManager({ userId, socket, backendUrl, onStatusCha
             {status.includes('✅') && (
                 <button 
                     onClick={handleResetEngine}
-                    className="mt-4 text-[9px] text-slate-700 hover:text-red-500 font-bold uppercase"
+                    className="mt-2 text-[8px] text-slate-700 hover:text-red-500 font-bold uppercase"
                 >
-                    Logout / Reset
+                    Logout / Switch
                 </button>
             )}
           </div>

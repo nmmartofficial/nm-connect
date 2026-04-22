@@ -571,7 +571,7 @@ export default function App() {
       
       {/* SIDEBAR */}
       <div className={`fixed md:relative z-[100] md:z-auto h-full w-72 bg-slate-900 border-r border-slate-800 p-6 flex flex-col transform transition-transform duration-300 ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
-        <div className="flex justify-between items-center mb-8">
+        <div className="flex justify-between items-center mb-6">
             <div className="flex items-center gap-2">
                 <Zap size={24} className="text-blue-500" fill="currentColor"/>
                 <h1 className="text-xl font-black italic uppercase tracking-tighter text-white">NM CONNECT</h1>
@@ -579,45 +579,44 @@ export default function App() {
             <button onClick={() => setIsMobileMenuOpen(false)} className="md:hidden text-slate-400"><X size={24}/></button>
         </div>
 
-        <SessionManager 
-          userId={USER_ID} 
-          socket={socket} 
-          backendUrl={BACKEND_URL}
-          onStatusChange={setIsWhatsAppReady} 
-        />
-
-        <nav className="space-y-2 mt-8 flex-1 overflow-y-auto custom-scrollbar pr-2">
-          <button onClick={() => setActiveTab('dashboard')} className={`w-full flex items-center gap-3 p-3 rounded-xl font-bold transition-all ${activeTab === 'dashboard' ? 'bg-blue-600 text-white' : 'hover:bg-slate-800 text-slate-400'}`}>
+        <nav className="space-y-1 flex-1 overflow-y-auto custom-scrollbar pr-2">
+          <button onClick={() => setActiveTab('dashboard')} className={`w-full flex items-center gap-3 p-2.5 rounded-xl font-bold transition-all ${activeTab === 'dashboard' ? 'bg-blue-600 text-white' : 'hover:bg-slate-800 text-slate-400'}`}>
             <LayoutDashboard size={18}/> Dashboard
           </button>
-          <button onClick={() => setActiveTab('history')} className={`w-full flex items-center gap-3 p-3 rounded-xl font-bold transition-all ${activeTab === 'history' ? 'bg-blue-600 text-white' : 'hover:bg-slate-800 text-slate-400'}`}>
-            <HistoryIcon size={18}/> Campaign History
+          <button onClick={() => setActiveTab('history')} className={`w-full flex items-center gap-3 p-2.5 rounded-xl font-bold transition-all ${activeTab === 'history' ? 'bg-blue-600 text-white' : 'hover:bg-slate-800 text-slate-400'}`}>
+            <HistoryIcon size={18}/> History
           </button>
           
           <div className="relative group">
             <button 
                 onClick={() => userPlan.name === 'Gold' || userPlan.name === 'Enterprise' ? setActiveTab('bot') : setActiveTab('billing')} 
-                className={`w-full flex items-center gap-3 p-3 rounded-xl font-bold transition-all ${activeTab === 'bot' ? 'bg-blue-600 text-white' : 'hover:bg-slate-800 text-slate-400'}`}
+                className={`w-full flex items-center gap-3 p-2.5 rounded-xl font-bold transition-all ${activeTab === 'bot' ? 'bg-blue-600 text-white' : 'hover:bg-slate-800 text-slate-400'}`}
             >
-                <Bot size={18}/> AI Auto-Responder
+                <Bot size={18}/> AI Bot
                 {(userPlan.name !== 'Gold' && userPlan.name !== 'Enterprise') && <Crown size={12} className="ml-auto text-orange-500"/>}
-                {(userPlan.name === 'Gold' || userPlan.name === 'Enterprise') && <div className="ml-auto h-2 w-2 bg-green-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(34,197,94,0.6)]"></div>}
             </button>
           </div>
 
-          <button onClick={() => setActiveTab('billing')} className={`w-full flex items-center gap-3 p-3 rounded-xl font-bold transition-all ${activeTab === 'billing' ? 'bg-blue-600 text-white' : 'hover:bg-slate-800 text-slate-400'}`}>
-            <CreditCard size={18}/> Pricing & Plans
+          <button onClick={() => setActiveTab('billing')} className={`w-full flex items-center gap-3 p-2.5 rounded-xl font-bold transition-all ${activeTab === 'billing' ? 'bg-blue-600 text-white' : 'hover:bg-slate-800 text-slate-400'}`}>
+            <CreditCard size={18}/> Pricing
           </button>
 
-          <button onClick={() => setActiveTab('settings')} className={`w-full flex items-center gap-3 p-3 rounded-xl font-bold transition-all ${activeTab === 'settings' ? 'bg-blue-600 text-white' : 'hover:bg-slate-800 text-slate-400'}`}>
-            <Settings size={18}/> Profile Settings
+          <button onClick={() => setActiveTab('settings')} className={`w-full flex items-center gap-3 p-2.5 rounded-xl font-bold transition-all ${activeTab === 'settings' ? 'bg-blue-600 text-white' : 'hover:bg-slate-800 text-slate-400'}`}>
+            <Settings size={18}/> Profile
           </button>
         </nav>
 
-        <div className="pt-6 border-t border-slate-800">
-             <button onClick={() => supabase.auth.signOut()} className="w-full flex items-center gap-3 p-3 text-slate-500 hover:text-red-400 rounded-xl font-bold transition-colors">
-                <LogOut size={18}/> Logout
-             </button>
+        <div className="mt-4 pt-4 border-t border-slate-800">
+            <SessionManager 
+              userId={USER_ID} 
+              socket={socket} 
+              backendUrl={BACKEND_URL}
+              onStatusChange={setIsWhatsAppReady} 
+            />
+            
+            <button onClick={() => supabase.auth.signOut()} className="w-full flex items-center gap-3 p-2 text-slate-500 hover:text-red-400 rounded-xl font-bold transition-colors mt-2 text-xs uppercase tracking-widest">
+                <LogOut size={16}/> Logout
+            </button>
         </div>
       </div>
 
