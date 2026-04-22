@@ -326,14 +326,24 @@ app.post('/api/send-bulk', async (req, res) => {
     }
     
     // --- PLAN CHECKING LOGIC ---
-    const { data: userData, error: userError } = await supabase.from('users').select('plan_name, daily_limit').eq('id', userId).single();
+    const { data: userData, error: userError } = await supabase.from('users').select('plan_name, daily_limit, email').eq('id', userId).single();
     
     if (userError) {
         console.error("❌ Supabase User Fetch Error:", userError);
     }
 
-    const plan = userData?.plan_name || 'Free';
-    const limit = userData?.daily_limit || 50;
+    const userEmail = userData?.email || '';
+    const isAdmin = userEmail === 'nmmartofficial@gmail.com'; // Your admin email
+
+    let plan = userData?.plan_name || 'Free';
+    let limit = userData?.daily_limit || 50;
+
+    // --- ADMIN OVERRIDE: Unlock everything for YOU ---
+    if (isAdmin) {
+        plan = 'Enterprise';
+        limit = 999999;
+        console.log(`👑 Admin Access: Everything unlocked for ${userEmail}`);
+    }
 
     console.log(`📊 User Plan: ${plan}, Limit: ${limit}, Contacts: ${contacts.length}, Has Media: ${!!media}`);
 
