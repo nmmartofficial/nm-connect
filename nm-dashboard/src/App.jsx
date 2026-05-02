@@ -221,19 +221,30 @@ export default function App() {
   }, [USER_ID, socket]);
 
   const triggerCampaign = async (startIndex = 0) => {
+    console.log("📢 triggerCampaign called, startIndex:", startIndex);
+    console.log("📱 isWhatsAppReady:", isWhatsAppReady);
+    console.log("👥 Customers count:", customers.length);
+    console.log("📝 selectedIds count:", selectedIds.length);
+    console.log("📊 campaignProgress:", campaignProgress);
+    
     let targetList = customers;
     
     // If user has selected specific contacts, only send to those
     if (selectedIds.length > 0) {
         targetList = customers.filter(c => selectedIds.includes(c.id));
+        console.log("🎯 Filtered by selectedIds:", targetList.length);
     }
 
     // Filter out already sent contacts
     targetList = targetList.filter(c => !campaignProgress.sentContactIds.includes(c.id));
+    console.log("🎯 Filtered after sentContactIds:", targetList.length);
 
     const validMessages = Object.values(messageVariations).filter(m => m.trim() !== '');
-    if (validMessages.length === 0) return alert("Please enter at least one message variation!");
-    if (targetList.length === 0) return alert("No new contacts to send! All have already been sent.");
+    console.log("💬 Valid messages count:", validMessages.length);
+    
+    if (!isWhatsAppReady) return alert("⚠️ WhatsApp not connected! Please scan the QR code first.");
+    if (validMessages.length === 0) return alert("⚠️ Please enter at least one message variation!");
+    if (targetList.length === 0) return alert("⚠️ No new contacts to send! All have already been sent.");
 
     try {
       setLoading(true);
@@ -250,6 +261,7 @@ export default function App() {
         };
       }
 
+      console.log("🚀 Sending request to backend...");
       const response = await fetch(`${BACKEND_URL}/api/send-bulk`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -263,15 +275,23 @@ export default function App() {
           campaignName: campaignName || `Campaign ${new Date().toLocaleDateString()}`
         })
       });
+      
+      console.log("📥 Response status:", response.status);
+      const result = await response.json();
+      console.log("📥 Response data:", result);
+      
       if (response.ok) {
           const statusMsg = scheduledTime ? `Campaign scheduled for ${new Date(scheduledTime).toLocaleString()}...` : `Campaign started from index ${startIndex} (${targetList.length} contacts)...`;
           setLogs(prev => [{ type: 'info', msg: statusMsg, time: new Date().toLocaleTimeString() }, ...prev]);
           if (scheduledTime) setScheduledTime(''); // Reset after scheduling
           setCampaignName(''); // Reset
           fetchCampaignHistory();
+      } else {
+        alert(`⚠️ Error: ${result.error || 'Something went wrong!'}`);
       }
     } catch (err) {
-      alert("Backend connection error!");
+      console.error("❌ Error:", err);
+      alert(`⚠️ Backend connection error! ${err.message}`);
     } finally {
       setLoading(false);
     }
@@ -714,9 +734,9 @@ export default function App() {
                                                 <button 
                                                     onClick={() => triggerCampaign(0)} 
                                                     disabled={loading || !isWhatsAppReady}
-                                                    className="flex-1 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed text-white py-4 rounded-xl font-black uppercase tracking-widest transition-all border border-slate-700"
+                                                    className="flex-1 bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed text-white py-4 rounded-xl font-black uppercase tracking-widest transition-all shadow-lg shadow-green-500/20 border border-green-700"
                                                 >
-                                                    Start from Beginning
+                                                    <Send size={20}/> Start from Beginning
                                                 </button>
                                                 
                                                 {campaignProgress.lastIndex > -1 && (
@@ -728,6 +748,17 @@ export default function App() {
                                                         Resume from #{campaignProgress.lastIndex + 2}
                                                     </button>
                                                 )}
+                                                
+                                                <button 
+                                                    onClick={() => {
+                                                        if (window.confirm("Reset campaign progress? This will allow you to resend to all contacts.")) {
+                                                            setCampaignProgress({ current: 0, total: 0, sent: 0, invalid: 0, lastIndex: -1, sentContactIds: [] });
+                                                        }
+                                                    }}
+                                                    className="px-4 bg-slate-700 hover:bg-slate-600 text-slate-300 py-4 rounded-xl font-bold uppercase tracking-widest transition-all"
+                                                >
+                                                    <RefreshCcw size={18}/> Reset
+                                                </button>
                                             </>
                                         )}
                                      </div>
