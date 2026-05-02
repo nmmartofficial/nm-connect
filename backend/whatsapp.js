@@ -45,18 +45,29 @@ const initWA = async (userId, io, supabase) => {
 const processCampaign = async (userId, camp, client, io, isRunning, supabase) => {
     const { contacts, messages, media } = camp.metadata;
     let sent = 0, invalid = 0;
+    
     for (let i = 0; i < contacts.length; i++) {
         if (!isRunning()) break;
         try {
             const jid = contacts[i].number.replace(/\D/g, '') + '@s.whatsapp.net';
             const msg = messages[Math.floor(Math.random() * messages.length)].replace(/{name}/g, contacts[i].name || '');
+            
             await client.sendMessage(jid, { text: msg });
             sent++;
             await supabase.from('customers').update({ status: 'Sent' }).eq('id', contacts[i].id);
         } catch (e) { invalid++; }
+        
         await supabase.from('campaigns').update({ sent_count: sent, invalid_count: invalid }).eq('id', camp.id);
-        io.emit(`log_${userId}`, { type: 'success', progress: { current: i + 1, total: contacts.length, sent, invalid } });
-        await new Promise(r => setTimeout(r, 15000 + Math.random() * 10000));
+        io.emit(`log_${userId}`, { 
+            type: 'success', 
+            sentContactId: contacts[i].id,
+            progress: { current: i + 1, total: contacts.length, sent, invalid, lastIndex: i } 
+        });
+        
+        const baseInterval = 86000;
+        const randomVariation = Math.random() * 60000 - 30000;
+        const finalInterval = Math.max(30000, baseInterval + randomVariation);
+        await new Promise(r => setTimeout(r, finalInterval));
     }
     await supabase.from('campaigns').update({ status: 'Completed' }).eq('id', camp.id);
 };

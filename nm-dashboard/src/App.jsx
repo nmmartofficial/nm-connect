@@ -37,9 +37,11 @@ export default function App() {
   const [selectedIds, setSelectedIds] = useState([]);
   const [userPlan, setUserPlan] = useState({ name: 'Free', limit: 50 }); // Initial state
   const [showPaymentModal, setShowPaymentModal] = useState(null); // { plan, price }
+  const [showAddContactModal, setShowAddContactModal] = useState(false); // Add Contact Modal state
+  const [newContact, setNewContact] = useState({ name: '', number: '' }); // New Contact state
   const [campaignProgress, setCampaignProgress] = useState(() => {
     const saved = localStorage.getItem('campaignProgress');
-    return saved ? JSON.parse(saved) : { current: 0, total: 0, sent: 0, invalid: 0, lastIndex: -1 };
+    return saved ? JSON.parse(saved) : { current: 0, total: 0, sent: 0, invalid: 0, lastIndex: -1, sentContactIds: [] };
   });
 
   useEffect(() => {
@@ -189,7 +191,13 @@ export default function App() {
       console.log("📝 Received log via user event:", newLog);
       
       if (newLog.progress) {
-        setCampaignProgress(newLog.progress);
+        setCampaignProgress(prev => {
+          const updatedProgress = { ...prev, ...newLog.progress };
+          if (newLog.sentContactId && !prev.sentContactIds.includes(newLog.sentContactId)) {
+            updatedProgress.sentContactIds = [...prev.sentContactIds, newLog.sentContactId];
+          }
+          return updatedProgress;
+        });
       }
 
       setLogs(prev => [{ ...newLog, time: new Date().toLocaleTimeString() }, ...prev].slice(0, 50));
@@ -220,13 +228,17 @@ export default function App() {
         targetList = customers.filter(c => selectedIds.includes(c.id));
     }
 
+    // Filter out already sent contacts
+    targetList = targetList.filter(c => !campaignProgress.sentContactIds.includes(c.id));
+
     const validMessages = Object.values(messageVariations).filter(m => m.trim() !== '');
     if (validMessages.length === 0) return alert("Please enter at least one message variation!");
+    if (targetList.length === 0) return alert("No new contacts to send! All have already been sent.");
 
     try {
       setLoading(true);
       if (startIndex === 0) {
-        setCampaignProgress({ current: 0, total: targetList.length, sent: 0, invalid: 0, lastIndex: -1 });
+        setCampaignProgress({ current: 0, total: targetList.length, sent: 0, invalid: 0, lastIndex: -1, sentContactIds: [] });
       }
       
       let mediaData = null;
@@ -369,6 +381,32 @@ export default function App() {
       });
     };
     reader.readAsDataURL(file);
+  };
+
+  const handleAddContact = async () => {
+    if (!newContact.name.trim() || !newContact.number.trim()) {
+      alert("Please enter both name and number!");
+      return;
+    }
+    const normalizedNumber = newContact.number.replace(/\D/g, '');
+    if (normalizedNumber.length < 10) {
+      alert("Please enter a valid phone number (at least 10 digits)!");
+      return;
+    }
+    const { error } = await supabase.from('customers').insert([{
+      name: newContact.name.trim(),
+      number: normalizedNumber,
+      status: 'Pending',
+      user_id: USER_ID
+    }]);
+    if (!error) {
+      alert("Contact added successfully!");
+      setNewContact({ name: '', number: '' });
+      setShowAddContactModal(false);
+      fetchCustomers();
+    } else {
+      alert("Error adding contact!");
+    }
   };
 
   const deleteData = async () => {
@@ -538,6 +576,12 @@ export default function App() {
                                             className="cursor-pointer bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-2 transition-all"
                                         >
                                             <RefreshCcw size={14} className={loading ? 'animate-spin' : ''}/> Contact Sync
+                                        </button>
+                                        <button 
+                                            onClick={() => setShowAddContactModal(true)}
+                                            className="cursor-pointer bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-2 transition-all"
+                                        >
+                                            <Users size={14}/> Add Contact
                                         </button>
                                         <label className="cursor-pointer bg-slate-800 hover:bg-slate-700 text-slate-300 px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-2 transition-all border border-slate-700">
                                             <Upload size={14}/> CSV
@@ -1114,6 +1158,49 @@ export default function App() {
                             className="w-full bg-blue-600 hover:bg-blue-700 text-white font-black py-4 rounded-2xl uppercase tracking-widest transition-all shadow-lg shadow-blue-500/20"
                         >
                             {loading ? 'Processing...' : 'I have Paid'}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        )}
+
+        {/* ADD CONTACT MODAL */}
+        {showAddContactModal && (
+            <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
+                <div className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-md overflow-hidden shadow-2xl">
+                    <div className="p-6 border-b border-slate-800 flex justify-between items-center bg-slate-800/30">
+                        <h3 className="font-black uppercase tracking-widest text-sm flex items-center gap-2">
+                            <Users size={18} className="text-green-500"/> Add New Contact
+                        </h3>
+                        <button onClick={() => setShowAddContactModal(false)} className="text-slate-500 hover:text-white"><X size={20}/></button>
+                    </div>
+                    <div className="p-6 space-y-4">
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-bold uppercase text-slate-500 ml-1">Customer Name</label>
+                            <input 
+                                type="text" 
+                                placeholder="Enter customer name" 
+                                className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-sm outline-none focus:border-green-500 transition-all"
+                                value={newContact.name}
+                                onChange={(e) => setNewContact({...newContact, name: e.target.value})}
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-bold uppercase text-slate-500 ml-1">Phone Number</label>
+                            <input 
+                                type="text" 
+                                placeholder="Enter phone number (10+ digits)" 
+                                className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-sm outline-none focus:border-green-500 transition-all"
+                                value={newContact.number}
+                                onChange={(e) => setNewContact({...newContact, number: e.target.value})}
+                            />
+                        </div>
+                        <button 
+                            onClick={handleAddContact}
+                            disabled={loading}
+                            className="w-full bg-green-600 hover:bg-green-700 text-white font-black py-4 rounded-2xl uppercase tracking-widest transition-all shadow-lg shadow-green-500/20 mt-4"
+                        >
+                            {loading ? 'Adding...' : 'Add Contact'}
                         </button>
                     </div>
                 </div>
