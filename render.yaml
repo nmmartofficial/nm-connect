@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: nm-connect
+    runtime: node
+    plan: free
+    buildCommand: npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_VERSION
+        value: 20
+      - key: SUPABASE_URL
+        value: https://riinnhpjxmmywmcvkiqd.supabase.co
+      - key: SUPABASE_KEY
+        value: sb_publishable_IxXjjNJYFpS-7q09_6zCjg_mAMF14lu
+      - key: VITE_SUPABASE_URL
+        value: https://riinnhpjxmmywmcvkiqd.supabase.co
+      - key: VITE_SUPABASE_ANON_KEY
+        value: sb_publishable_IxXjjNJYFpS-7q09_6zCjg_mAMF14lu

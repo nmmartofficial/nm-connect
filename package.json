@@ -1,0 +1,17 @@
+{
+  "name": "nm-connect-master",
+  "version": "1.0.0",
+  "description": "WhatsApp Marketing Tool - Master Project",
+  "private": true,
+  "scripts": {
+    "install:all": "npm install && cd backend && npm install && cd ../nm-dashboard && npm install",
+    "backend": "cd backend && npm start",
+    "frontend": "cd nm-dashboard && npm run dev",
+    "dev": "concurrently \"npm run backend\" \"npm run frontend\"",
+    "build": "cd nm-dashboard && npm install && npm run build && cd ../backend && npm install",
+    "start": "cd backend && node server.js"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}

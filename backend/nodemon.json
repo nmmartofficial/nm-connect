@@ -1,0 +1,7 @@
+{
+  "ignore": [
+    "sessions/*",
+    "killPort.js"
+  ],
+  "ext": "js,json,env"
+}
