@@ -12,7 +12,9 @@ import SessionManager from './SessionManager';
 import Login from './components/Login';
 
 // --- LOCAL/PRODUCTION AUTO-DETECT ---
-const BACKEND_URL = window.location.hostname === 'localhost' ? "http://localhost:3001" : window.location.origin;
+const BACKEND_URL = window.location.hostname === 'localhost' 
+  ? "http://localhost:3001" 
+  : import.meta.env.VITE_BACKEND_URL || "https://nm-connect-1.onrender.com";
 console.log("📍 API Backend URL in use:", BACKEND_URL);
 
 export default function App() {
@@ -41,7 +43,16 @@ export default function App() {
   const [newContact, setNewContact] = useState({ name: '', number: '' }); // New Contact state
   const [campaignProgress, setCampaignProgress] = useState(() => {
     const saved = localStorage.getItem('campaignProgress');
-    return saved ? JSON.parse(saved) : { current: 0, total: 0, sent: 0, invalid: 0, lastIndex: -1, sentContactIds: [] };
+    const defaultState = { current: 0, total: 0, sent: 0, invalid: 0, lastIndex: -1, sentContactIds: [] };
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        return { ...defaultState, ...parsed };
+      } catch (e) {
+        return defaultState;
+      }
+    }
+    return defaultState;
   });
 
   useEffect(() => {
@@ -192,9 +203,10 @@ export default function App() {
       
       if (newLog.progress) {
         setCampaignProgress(prev => {
-          const updatedProgress = { ...prev, ...newLog.progress };
-          if (newLog.sentContactId && !prev.sentContactIds.includes(newLog.sentContactId)) {
-            updatedProgress.sentContactIds = [...prev.sentContactIds, newLog.sentContactId];
+          const safePrev = { ...prev, sentContactIds: Array.isArray(prev.sentContactIds) ? prev.sentContactIds : [] };
+          const updatedProgress = { ...safePrev, ...newLog.progress };
+          if (newLog.sentContactId && !safePrev.sentContactIds.includes(newLog.sentContactId)) {
+            updatedProgress.sentContactIds = [...safePrev.sentContactIds, newLog.sentContactId];
           }
           return updatedProgress;
         });
@@ -235,8 +247,9 @@ export default function App() {
         console.log("🎯 Filtered by selectedIds:", targetList.length);
     }
 
-    // Filter out already sent contacts
-    targetList = targetList.filter(c => !campaignProgress.sentContactIds.includes(c.id));
+    // Filter out already sent contacts (with safeguard)
+    const sentIds = Array.isArray(campaignProgress.sentContactIds) ? campaignProgress.sentContactIds : [];
+    targetList = targetList.filter(c => !sentIds.includes(c.id));
     console.log("🎯 Filtered after sentContactIds:", targetList.length);
 
     const validMessages = Object.values(messageVariations).filter(m => m.trim() !== '');
