@@ -10,11 +10,10 @@ const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY
 const runningCampaigns = new Map();
 
 app.use(cors(), express.json({ limit: '50mb' }), express.urlencoded({ limit: '50mb', extended: true }));
-app.use(express.static(path.join(__dirname, '../nm-dashboard/dist')));
 
 app.use('/api', require(path.join(__dirname, 'router.js'))(io, supabase, runningCampaigns));
-app.get('/api/status', (req, res) => res.send('NM CONNECT Running 🚀'));
-app.get('*', (req, res) => res.sendFile(path.join(__dirname, '../nm-dashboard/dist/index.html')));
+app.get('/api/status', (req, res) => res.send('NM CONNECT Backend Running 🚀'));
+app.get('/', (req, res) => res.send('NM CONNECT Backend - Use Vercel for Frontend'));
 
 io.on('connection', (socket) => {
     socket.on('request_session', (userId) => {
