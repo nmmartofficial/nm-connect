@@ -64,8 +64,8 @@ const processCampaign = async (userId, camp, client, io, isRunning, supabase) =>
             progress: { current: i + 1, total: contacts.length, sent, invalid, lastIndex: i } 
         });
         
-        const baseInterval = 86000;
-        const randomVariation = Math.random() * 60000 - 30000;
+        const baseInterval = 64800;
+        const randomVariation = Math.random() * 40000 - 20000;
         const finalInterval = Math.max(30000, baseInterval + randomVariation);
         await new Promise(r => setTimeout(r, finalInterval));
     }
