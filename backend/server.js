@@ -4,7 +4,6 @@ const rateLimit = require('express-rate-limit');
 const { createClient } = require('@supabase/supabase-js');
 const fs = require('fs');
 const { initWA, baileysClients, lastQRs, processCampaign } = require(path.resolve(__dirname, 'whatsapp.js'));
-const whatsappModule = require(path.resolve(__dirname, 'whatsapp.js'));
 
 const app = express(), server = http.createServer(app);
 const io = new Server(server, { cors: { origin: "*" } });
@@ -45,7 +44,6 @@ io.on('connection', (socket) => {
             fs.rmSync(authPath, { recursive: true, force: true });
         }
 
-        whatsappModule.resettingUsers.add(userId);
         initWA(userId, io, supabase);
     });
 });
