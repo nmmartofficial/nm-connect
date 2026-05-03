@@ -70,7 +70,6 @@ const processCampaign = async (userId, camp, client, io, isRunning, supabase) =>
                 msg = msg.replace(/{phone}/g, contacts[i].number || '');
                 
                 await client.sendPresenceUpdate('composing', jid);
-                await new Promise(r => setTimeout(r, 1000));
                 await client.sendMessage(jid, { text: msg });
                 await client.sendPresenceUpdate('paused', jid);
                 sent++;
