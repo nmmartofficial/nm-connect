@@ -40,7 +40,10 @@ export default function App() {
   const [whatsappName, setWhatsappName] = useState(null);
   const [isCampaignPaused, setIsCampaignPaused] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [messageVariations, setMessageVariations] = useState({ A: '', B: '', C: '' });
+  const [messageVariations, setMessageVariations] = useState(() => {
+    const saved = localStorage.getItem('messageVariations');
+    return saved ? JSON.parse(saved) : { A: '', B: '', C: '' };
+  });
   const [selectedMedia, setSelectedMedia] = useState(null);
   const [scheduledTime, setScheduledTime] = useState('');
   const [campaignName, setCampaignName] = useState('');
@@ -83,6 +86,10 @@ export default function App() {
       document.documentElement.classList.remove('dark');
     }
   }, [darkMode]);
+
+  useEffect(() => {
+    localStorage.setItem('messageVariations', JSON.stringify(messageVariations));
+  }, [messageVariations]);
 
   const socket = useMemo(() => io(BACKEND_URL, {
     transports: ['polling', 'websocket'],
@@ -536,6 +543,9 @@ export default function App() {
           <button onClick={() => setActiveTab('dashboard')} className={`w-full flex items-center gap-3 p-3 rounded-xl font-bold transition-all ${activeTab === 'dashboard' ? 'bg-blue-600 text-white' : 'hover:bg-slate-800 text-slate-400'}`}>
             <LayoutDashboard size={18}/> Dashboard
           </button>
+          <button onClick={() => setActiveTab('stats')} className={`w-full flex items-center gap-3 p-3 rounded-xl font-bold transition-all ${activeTab === 'stats' ? 'bg-blue-600 text-white' : 'hover:bg-slate-800 text-slate-400'}`}>
+            <TrendingUp size={18}/> Campaign Stats
+          </button>
           <button onClick={() => setActiveTab('history')} className={`w-full flex items-center gap-3 p-3 rounded-xl font-bold transition-all ${activeTab === 'history' ? 'bg-blue-600 text-white' : 'hover:bg-slate-800 text-slate-400'}`}>
             <HistoryIcon size={18}/> Campaign History
           </button>
@@ -595,7 +605,7 @@ export default function App() {
         </header>
 
         <main className="flex-1 overflow-y-auto p-6 space-y-6">
-            {activeTab === 'dashboard' ? (
+            {activeTab === 'stats' ? (
                 <>
                     {/* STATS CARDS */}
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -654,7 +664,9 @@ export default function App() {
                             />
                         </div>
                     </div>
-
+                </>
+            ) : activeTab === 'dashboard' ? (
+                <>
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                         {/* LEFT: CAMPAIGN CONTROL */}
                         <div className="lg:col-span-2 space-y-6">
