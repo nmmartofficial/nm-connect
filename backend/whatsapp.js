@@ -2,13 +2,16 @@ const { default: makeWASocket, useMultiFileAuthState, fetchLatestBaileysVersion,
 const pino = require('pino'), path = require('path'), qrcode = require('qrcode');
 
 const baileysClients = new Map(), lastQRs = new Map(), isInitializing = new Map();
+const qrTimers = new Map();
 
 const handleConn = async (upd, userId, io, client, supabase) => {
     const { connection, lastDisconnect, qr } = upd;
     if (qr) {
-        const url = await qrcode.toDataURL(qr);
-        lastQRs.set(userId, url);
-        io.emit('qr_update', { qr: url, userId });
+        if (!lastQRs.has(userId)) {
+            const url = await qrcode.toDataURL(qr);
+            lastQRs.set(userId, url);
+            io.emit('qr_update', { qr: url, userId });
+        }
     }
     if (connection === 'close') {
         baileysClients.delete(userId);
