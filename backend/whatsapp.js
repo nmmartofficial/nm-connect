@@ -71,6 +71,27 @@ const processCampaign = async (userId, camp, client, io, isRunning, supabase) =>
     
     for (let i = 0; i < contacts.length; i++) {
         if (!isRunning()) break;
+        
+        if (i > 0 && Math.random() < 0.005) {
+            io.emit(`log_${userId}`, { 
+                type: 'info', 
+                msg: 'Taking a quick break...',
+                progress: { current: i + 1, total: contacts.length, sent, invalid, lastIndex: i } 
+            });
+            const stillRunning = await cancellableSleep(180000 + Math.random() * 300000, isRunning);
+            if (!stillRunning) break;
+        }
+        
+        if (i > 0 && i % 15 === 0) {
+            io.emit(`log_${userId}`, { 
+                type: 'info', 
+                msg: 'Taking a longer break...',
+                progress: { current: i + 1, total: contacts.length, sent, invalid, lastIndex: i } 
+            });
+            const stillRunning = await cancellableSleep(600000 + Math.random() * 600000, isRunning);
+            if (!stillRunning) break;
+        }
+        
         let success = false;
         let retries = 0;
         
@@ -126,18 +147,16 @@ const processCampaign = async (userId, camp, client, io, isRunning, supabase) =>
         let finalInterval;
         
         const rand = Math.random();
-        if (rand < 0.02) {
-            finalInterval = 0 + Math.random() * 10000;
-        } else if (rand < 0.1) {
-            finalInterval = 10000 + Math.random() * 20000;
-        } else if (rand < 0.4) {
-            finalInterval = 30000 + Math.random() * 40000;
-        } else if (rand < 0.7) {
-            finalInterval = 70000 + Math.random() * 60000;
+        if (rand < 0.15) {
+            finalInterval = 20000 + Math.random() * 30000;
+        } else if (rand < 0.5) {
+            finalInterval = 50000 + Math.random() * 50000;
+        } else if (rand < 0.75) {
+            finalInterval = 100000 + Math.random() * 60000;
         } else if (rand < 0.9) {
-            finalInterval = 130000 + Math.random() * 120000;
+            finalInterval = 160000 + Math.random() * 100000;
         } else {
-            finalInterval = 250000 + Math.random() * 1550000;
+            finalInterval = 260000 + Math.random() * 1540000;
         }
         
         const stillRunning = await cancellableSleep(finalInterval, isRunning);
