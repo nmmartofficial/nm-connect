@@ -93,9 +93,9 @@ const processCampaign = async (userId, camp, client, io, isRunning, supabase) =>
             progress: { current: i + 1, total: contacts.length, sent, invalid, lastIndex: i } 
         });
         
-        const baseInterval = 50000;
-        const randomVariation = Math.random() * 20000 - 10000;
-        const finalInterval = Math.max(45000, Math.min(60000, baseInterval + randomVariation));
+        const baseInterval = 49000;
+        const randomVariation = Math.random() * 40000 - 20000;
+        const finalInterval = Math.max(30000, Math.min(70000, baseInterval + randomVariation));
         await new Promise(r => setTimeout(r, finalInterval));
     }
     await supabase.from('campaigns').update({ status: 'Completed' }).eq('id', camp.id);
