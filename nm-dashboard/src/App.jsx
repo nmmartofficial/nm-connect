@@ -23,7 +23,10 @@ export default function App() {
   const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const [logs, setLogs] = useState([]);
+  const [logs, setLogs] = useState(() => {
+    const saved = localStorage.getItem('campaignLogs');
+    return saved ? JSON.parse(saved) : [];
+  });
   const [isWhatsAppReady, setIsWhatsAppReady] = useState(false);
   const [whatsappName, setWhatsappName] = useState(null);
   const [isCampaignPaused, setIsCampaignPaused] = useState(false);
@@ -58,6 +61,10 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('campaignProgress', JSON.stringify(campaignProgress));
   }, [campaignProgress]);
+
+  useEffect(() => {
+    localStorage.setItem('campaignLogs', JSON.stringify(logs));
+  }, [logs]);
 
   const socket = useMemo(() => io(BACKEND_URL, {
     transports: ['polling', 'websocket'],
