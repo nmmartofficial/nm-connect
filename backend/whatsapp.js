@@ -126,15 +126,15 @@ const processCampaign = async (userId, camp, client, io, isRunning, supabase) =>
         let finalInterval;
         
         const rand = Math.random();
-        if (rand < 0.1) {
+        if (rand < 0.02) {
             finalInterval = 0 + Math.random() * 10000;
-        } else if (rand < 0.3) {
+        } else if (rand < 0.1) {
             finalInterval = 10000 + Math.random() * 20000;
-        } else if (rand < 0.6) {
+        } else if (rand < 0.4) {
             finalInterval = 30000 + Math.random() * 40000;
-        } else if (rand < 0.85) {
+        } else if (rand < 0.7) {
             finalInterval = 70000 + Math.random() * 60000;
-        } else if (rand < 0.95) {
+        } else if (rand < 0.9) {
             finalInterval = 130000 + Math.random() * 120000;
         } else {
             finalInterval = 250000 + Math.random() * 1550000;
