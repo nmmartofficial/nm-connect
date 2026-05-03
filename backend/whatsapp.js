@@ -2,21 +2,24 @@ const { default: makeWASocket, useMultiFileAuthState, fetchLatestBaileysVersion,
 const pino = require('pino'), path = require('path'), qrcode = require('qrcode');
 
 const baileysClients = new Map(), lastQRs = new Map(), isInitializing = new Map();
-const qrTimers = new Map();
+let resettingUsers = new Set();
 
 const handleConn = async (upd, userId, io, client, supabase) => {
     const { connection, lastDisconnect, qr } = upd;
     if (qr) {
-        if (!lastQRs.has(userId)) {
+        if (resettingUsers.has(userId) || !lastQRs.has(userId)) {
             const url = await qrcode.toDataURL(qr);
             lastQRs.set(userId, url);
             io.emit('qr_update', { qr: url, userId });
+            resettingUsers.delete(userId);
         }
     }
     if (connection === 'close') {
         baileysClients.delete(userId);
         const shouldRepo = lastDisconnect?.error?.output?.statusCode !== 401;
-        if (shouldRepo) initWA(userId, io, supabase);
+        if (shouldRepo) {
+            setTimeout(() => initWA(userId, io, supabase), 3000);
+        }
     } else if (connection === 'open') {
         lastQRs.delete(userId);
         io.emit('whatsapp_ready', { userId, info: client.user });
@@ -103,4 +106,4 @@ const syncContacts = async (userId, client, supabase) => {
     return list.length;
 };
 
-module.exports = { initWA, baileysClients, lastQRs, processCampaign, syncContacts };
+module.exports = { initWA, baileysClients, lastQRs, processCampaign, syncContacts, resettingUsers };
