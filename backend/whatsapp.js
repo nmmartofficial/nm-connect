@@ -29,7 +29,13 @@ const initWA = async (userId, io, supabase) => {
     try {
         const { state, saveCreds } = await useMultiFileAuthState(`./auth_info_baileys/${userId}`);
         const { version } = await fetchLatestBaileysVersion();
-        const client = makeWASocket({ version, auth: { creds: state.creds, keys: makeCacheableSignalKeyStore(state.keys, pino({ level: 'silent' })) }, printQRInTerminal: false, logger: pino({ level: 'silent' }), browser: ["NM MART", "Chrome", "1.0.0"] });
+        const client = makeWASocket({ 
+            version, 
+            auth: { creds: state.creds, keys: makeCacheableSignalKeyStore(state.keys, pino({ level: 'silent' })) }, 
+            printQRInTerminal: false, 
+            logger: pino({ level: 'silent' }), 
+            browser: ["WhatsApp", "Chrome", "120.0.0.0"] 
+        });
         baileysClients.set(userId, client);
         client.ev.on('creds.update', saveCreds);
         client.ev.on('connection.update', (upd) => handleConn(upd, userId, io, client, supabase));
@@ -39,7 +45,10 @@ const initWA = async (userId, io, supabase) => {
                 if (!m.message || m.key.fromMe) continue;
                 const text = m.message.conversation || m.message.extendedTextMessage?.text || "";
                 const { data } = await supabase.from('auto_responses').select('response').eq('user_id', userId).ilike('keyword', text.trim()).single();
-                if (data) await client.sendMessage(m.key.remoteJid, { text: data.response });
+                if (data) {
+                    await new Promise(r => setTimeout(r, 1000 + Math.random() * 2000));
+                    await client.sendMessage(m.key.remoteJid, { text: data.response });
+                }
             }
         });
     } catch (e) { console.error('WA Init Error:', e.message); } finally { isInitializing.set(userId, false); }
@@ -77,7 +86,16 @@ const processCampaign = async (userId, camp, client, io, isRunning, supabase) =>
                 msg = msg.replace(/{phone}/g, contacts[i].number || '');
                 
                 await client.sendPresenceUpdate('composing', jid);
+                
+                const composingTime = 1500 + Math.random() * 3000 + (msg.length * 20);
+                await cancellableSleep(composingTime, isRunning);
+                if (!isRunning()) break;
+                
                 await client.sendMessage(jid, { text: msg });
+                
+                await cancellableSleep(500 + Math.random() * 1000, isRunning);
+                if (!isRunning()) break;
+                
                 await client.sendPresenceUpdate('paused', jid);
                 sent++;
                 await supabase.from('customers').update({ status: 'Sent' }).eq('id', contacts[i].id);
@@ -87,7 +105,7 @@ const processCampaign = async (userId, camp, client, io, isRunning, supabase) =>
                 if (retries > MAX_RETRIES) {
                     invalid++;
                 } else {
-                    const stillRunning = await cancellableSleep(5000, isRunning);
+                    const stillRunning = await cancellableSleep(8000 + Math.random() * 5000, isRunning);
                     if (!stillRunning) break;
                 }
             }
@@ -105,9 +123,14 @@ const processCampaign = async (userId, camp, client, io, isRunning, supabase) =>
         
         if (!isRunning()) break;
         
-        const baseInterval = 49000;
-        const randomVariation = Math.random() * 40000 - 20000;
-        const finalInterval = Math.max(30000, Math.min(70000, baseInterval + randomVariation));
+        const baseInterval = 90000;
+        const randomVariation = Math.random() * 60000 - 30000;
+        let finalInterval = Math.max(60000, Math.min(150000, baseInterval + randomVariation));
+        
+        if (i > 0 && i % 5 === 0) {
+            finalInterval += 60000 + Math.random() * 120000;
+        }
+        
         const stillRunning = await cancellableSleep(finalInterval, isRunning);
         if (!stillRunning) break;
     }
