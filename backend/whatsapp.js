@@ -45,22 +45,43 @@ const initWA = async (userId, io, supabase) => {
 const processCampaign = async (userId, camp, client, io, isRunning, supabase) => {
     const { contacts, messages, media } = camp.metadata;
     let sent = 0, invalid = 0;
+    const MAX_RETRIES = 2;
     
     for (let i = 0; i < contacts.length; i++) {
         if (!isRunning()) break;
-        try {
-            const jid = contacts[i].number.replace(/\D/g, '') + '@s.whatsapp.net';
-            const msg = messages[Math.floor(Math.random() * messages.length)].replace(/{name}/g, contacts[i].name || '');
-            
-            await client.sendMessage(jid, { text: msg });
-            sent++;
-            await supabase.from('customers').update({ status: 'Sent' }).eq('id', contacts[i].id);
-        } catch (e) { invalid++; }
+        let success = false;
+        let retries = 0;
+        
+        while (!success && retries <= MAX_RETRIES) {
+            try {
+                const jid = contacts[i].number.replace(/\D/g, '') + '@s.whatsapp.net';
+                let msg = messages[Math.floor(Math.random() * messages.length)];
+                
+                msg = msg.replace(/{name}/g, contacts[i].name || '');
+                msg = msg.replace(/{company}/g, contacts[i].company || '');
+                msg = msg.replace(/{city}/g, contacts[i].city || '');
+                msg = msg.replace(/{email}/g, contacts[i].email || '');
+                msg = msg.replace(/{phone}/g, contacts[i].number || '');
+                
+                await client.sendMessage(jid, { text: msg });
+                sent++;
+                await supabase.from('customers').update({ status: 'Sent' }).eq('id', contacts[i].id);
+                success = true;
+            } catch (e) { 
+                retries++;
+                if (retries > MAX_RETRIES) {
+                    invalid++;
+                } else {
+                    await new Promise(r => setTimeout(r, 5000));
+                }
+            }
+        }
         
         await supabase.from('campaigns').update({ sent_count: sent, invalid_count: invalid }).eq('id', camp.id);
         io.emit(`log_${userId}`, { 
-            type: 'success', 
-            sentContactId: contacts[i].id,
+            type: success ? 'success' : 'error', 
+            msg: success ? undefined : 'Failed to send message after multiple attempts',
+            sentContactId: success ? contacts[i].id : undefined,
             progress: { current: i + 1, total: contacts.length, sent, invalid, lastIndex: i } 
         });
         

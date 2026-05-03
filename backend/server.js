@@ -1,5 +1,6 @@
 require('dotenv').config();
 const express = require('express'), http = require('http'), { Server } = require('socket.io'), cors = require('cors'), path = require('path');
+const rateLimit = require('express-rate-limit');
 const { createClient } = require('@supabase/supabase-js');
 const fs = require('fs');
 const { initWA, baileysClients, lastQRs, processCampaign } = require(path.resolve(__dirname, 'whatsapp.js'));
@@ -9,7 +10,14 @@ const io = new Server(server, { cors: { origin: "*" } });
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 const runningCampaigns = new Map();
 
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100,
+  message: 'Too many requests from this IP, please try again later.'
+});
+
 app.use(cors(), express.json({ limit: '50mb' }), express.urlencoded({ limit: '50mb', extended: true }));
+app.use('/api', limiter);
 
 app.use('/api', require(path.join(__dirname, 'router.js'))(io, supabase, runningCampaigns));
 app.get('/api/status', (req, res) => res.send('NM CONNECT Backend Running 🚀'));

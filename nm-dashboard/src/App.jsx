@@ -5,10 +5,15 @@ import {
   Users, Send, TrendingUp, Upload, Database, 
   Search, Filter, Phone, MessageSquare, ShieldCheck, Zap, 
   ListChecks, Clock, XCircle, Trash2, RefreshCcw, Image as ImageIcon, LogOut, Menu, X,
-  CheckCircle2, AlertCircle, History as HistoryIcon, LayoutDashboard, Settings, CreditCard, Star, Crown
+  CheckCircle2, AlertCircle, History as HistoryIcon, LayoutDashboard, Settings, CreditCard, Star, Crown,
+  Sun, Moon
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
-import SessionManager from './SessionManager'; 
+import { Chart as ChartJS, ArcElement, Tooltip, Legend } from 'chart.js';
+import { Pie } from 'react-chartjs-2';
+import SessionManager from './SessionManager';
+
+ChartJS.register(ArcElement, Tooltip, Legend); 
 import Login from './components/Login';
 
 // --- LOCAL/PRODUCTION AUTO-DETECT ---
@@ -23,6 +28,10 @@ export default function App() {
   const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [darkMode, setDarkMode] = useState(() => {
+    const saved = localStorage.getItem('darkMode');
+    return saved ? JSON.parse(saved) : true;
+  });
   const [logs, setLogs] = useState(() => {
     const saved = localStorage.getItem('campaignLogs');
     return saved ? JSON.parse(saved) : [];
@@ -65,6 +74,15 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('campaignLogs', JSON.stringify(logs));
   }, [logs]);
+
+  useEffect(() => {
+    localStorage.setItem('darkMode', JSON.stringify(darkMode));
+    if (darkMode) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, [darkMode]);
 
   const socket = useMemo(() => io(BACKEND_URL, {
     transports: ['polling', 'websocket'],
@@ -152,6 +170,17 @@ export default function App() {
     }
   };
 
+  const showNotification = (title, body) => {
+    if ('Notification' in window && Notification.permission === 'granted') {
+      new Notification(title, {
+        body,
+        icon: '/favicon.svg'
+      });
+    } else if ('Notification' in window && Notification.permission !== 'denied') {
+      Notification.requestPermission();
+    }
+  };
+
   const handlePurchase = async (planName, price, limit) => {
     setShowPaymentModal({ plan: planName, price, limit });
   };
@@ -215,11 +244,19 @@ export default function App() {
           if (newLog.sentContactId && !safePrev.sentContactIds.includes(newLog.sentContactId)) {
             updatedProgress.sentContactIds = [...safePrev.sentContactIds, newLog.sentContactId];
           }
+          
+          if (updatedProgress.current === updatedProgress.total && updatedProgress.total > 0) {
+            showNotification('Campaign Complete!', `Successfully sent ${updatedProgress.sent} messages!`);
+          }
+          
           return updatedProgress;
         });
       }
 
       setLogs(prev => [{ ...newLog, time: new Date().toLocaleTimeString() }, ...prev].slice(0, 50));
+      if (newLog.type === 'error') {
+        showNotification('Campaign Error', newLog.msg || 'An error occurred while sending messages!');
+      }
       if (newLog.type === 'success' || newLog.type === 'error') {
           fetchCustomers();
       }
@@ -534,6 +571,12 @@ export default function App() {
                 <img src="/favicon.svg" alt="NM Logo" className="w-8 h-8 rounded-lg border border-slate-700" />
             </div>
             <div className="flex items-center gap-4 ml-auto">
+                <button 
+                    onClick={() => setDarkMode(!darkMode)} 
+                    className="p-2 bg-slate-800 hover:bg-slate-700 rounded-lg transition-all"
+                >
+                    {darkMode ? <Sun size={18} className="text-yellow-400"/> : <Moon size={18} className="text-blue-400"/>}
+                </button>
                 <div className="hidden md:flex items-center gap-2 px-3 py-1 bg-blue-500/10 rounded-full border border-blue-500/20">
                     <Crown size={14} className="text-blue-500"/>
                     <span className="text-[10px] font-black uppercase tracking-wider text-blue-500">{userPlan.name} Plan</span>
@@ -583,6 +626,32 @@ export default function App() {
                                 <p className="text-slate-500 text-xs font-bold uppercase">Invalid Removed</p>
                                 <p className="text-2xl font-black text-red-500">{campaignProgress.invalid}</p>
                             </div>
+                        </div>
+                    </div>
+
+                    {/* CHART */}
+                    <div className="bg-slate-900 p-6 rounded-2xl border border-slate-800">
+                        <h3 className="font-bold flex items-center gap-2 mb-4"><TrendingUp size={18} className="text-blue-500"/> Campaign Stats</h3>
+                        <div className="max-w-md mx-auto">
+                            <Pie 
+                                data={{
+                                    labels: ['Sent', 'Pending', 'Invalid'],
+                                    datasets: [{
+                                        data: [stats.sent, stats.pending, campaignProgress.invalid],
+                                        backgroundColor: ['#22c55e', '#f97316', '#ef4444'],
+                                        borderWidth: 0
+                                    }]
+                                }}
+                                options={{
+                                    responsive: true,
+                                    plugins: {
+                                        legend: {
+                                            position: 'bottom',
+                                            labels: { color: '#94a3b8' }
+                                        }
+                                    }
+                                }}
+                            />
                         </div>
                     </div>
 
