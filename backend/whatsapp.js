@@ -123,12 +123,21 @@ const processCampaign = async (userId, camp, client, io, isRunning, supabase) =>
         
         if (!isRunning()) break;
         
-        const baseInterval = 90000;
-        const randomVariation = Math.random() * 60000 - 30000;
-        let finalInterval = Math.max(60000, Math.min(150000, baseInterval + randomVariation));
+        let finalInterval;
         
-        if (i > 0 && i % 5 === 0) {
-            finalInterval += 60000 + Math.random() * 120000;
+        const rand = Math.random();
+        if (rand < 0.1) {
+            finalInterval = 0 + Math.random() * 10000;
+        } else if (rand < 0.3) {
+            finalInterval = 10000 + Math.random() * 20000;
+        } else if (rand < 0.6) {
+            finalInterval = 30000 + Math.random() * 40000;
+        } else if (rand < 0.85) {
+            finalInterval = 70000 + Math.random() * 60000;
+        } else if (rand < 0.95) {
+            finalInterval = 130000 + Math.random() * 120000;
+        } else {
+            finalInterval = 250000 + Math.random() * 1550000;
         }
         
         const stillRunning = await cancellableSleep(finalInterval, isRunning);
