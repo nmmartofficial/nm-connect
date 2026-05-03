@@ -22,6 +22,14 @@ const BACKEND_URL = window.location.hostname === 'localhost'
   : import.meta.env.VITE_BACKEND_URL || "https://nm-connect-1.onrender.com";
 console.log("📍 API Backend URL in use:", BACKEND_URL);
 
+const maskPhoneNumber = (text) => {
+  if (!text) return text;
+  return text.replace(/(\+?\d{1,3})?(\d{6,})(\d{4})/g, (match, countryCode, middle, last4) => {
+    const masked = '*'.repeat(middle.length);
+    return (countryCode || '') + masked + last4;
+  });
+};
+
 export default function App() {
   const [session, setSession] = useState(null);
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -972,7 +980,7 @@ export default function App() {
                                         'bg-blue-500/5 border-blue-500/10 text-blue-400'
                                     }`}>
                                         <span className="opacity-50 mr-2">[{log.time}]</span>
-                                        {log.msg}
+                                        {maskPhoneNumber(log.msg)}
                                     </div>
                                 )) : (
                                     <div className="h-full flex flex-col items-center justify-center text-slate-600 gap-2 italic">

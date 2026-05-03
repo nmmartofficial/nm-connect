@@ -1,6 +1,14 @@
 import React from 'react';
 import { Zap, ListChecks } from 'lucide-react';
 
+const maskPhoneNumber = (text) => {
+  if (!text) return text;
+  return text.replace(/(\+?\d{1,3})?(\d{6,})(\d{4})/g, (match, countryCode, middle, last4) => {
+    const masked = '*'.repeat(middle.length);
+    return (countryCode || '') + masked + last4;
+  });
+};
+
 const LiveActivity = ({ campaignProgress, logs = [] }) => {
   // Safety fallback for progress object
   const progress = campaignProgress || { current: 0, total: 0, nextAction: 'Waiting...' };
@@ -45,7 +53,7 @@ const LiveActivity = ({ campaignProgress, logs = [] }) => {
             logs.map((log, i) => (
               <div key={i} className={`flex gap-2 ${log.type === 'error' ? 'text-red-400' : log.type === 'success' ? 'text-green-400' : 'text-slate-400'}`}>
                 <span className="opacity-30">[{log.time || '00:00'}]</span>
-                <span className="break-all">{log.msg}</span>
+                <span className="break-all">{maskPhoneNumber(log.msg)}</span>
               </div>
             ))
           )}
