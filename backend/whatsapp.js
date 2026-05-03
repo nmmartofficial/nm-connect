@@ -45,6 +45,16 @@ const initWA = async (userId, io, supabase) => {
     } catch (e) { console.error('WA Init Error:', e.message); } finally { isInitializing.set(userId, false); }
 };
 
+const cancellableSleep = async (ms, isRunning) => {
+    const checkInterval = 500;
+    let elapsed = 0;
+    while (elapsed < ms && isRunning()) {
+        await new Promise(r => setTimeout(r, Math.min(checkInterval, ms - elapsed)));
+        elapsed += checkInterval;
+    }
+    return isRunning();
+};
+
 const processCampaign = async (userId, camp, client, io, isRunning, supabase) => {
     const { contacts, messages, media } = camp.metadata;
     let sent = 0, invalid = 0;
@@ -55,7 +65,7 @@ const processCampaign = async (userId, camp, client, io, isRunning, supabase) =>
         let success = false;
         let retries = 0;
         
-        while (!success && retries <= MAX_RETRIES) {
+        while (!success && retries <= MAX_RETRIES && isRunning()) {
             try {
                 const jid = contacts[i].number.replace(/\D/g, '') + '@s.whatsapp.net';
                 let msg = messages[Math.floor(Math.random() * messages.length)];
@@ -77,10 +87,13 @@ const processCampaign = async (userId, camp, client, io, isRunning, supabase) =>
                 if (retries > MAX_RETRIES) {
                     invalid++;
                 } else {
-                    await new Promise(r => setTimeout(r, 5000));
+                    const stillRunning = await cancellableSleep(5000, isRunning);
+                    if (!stillRunning) break;
                 }
             }
         }
+        
+        if (!isRunning()) break;
         
         await supabase.from('campaigns').update({ sent_count: sent, invalid_count: invalid }).eq('id', camp.id);
         io.emit(`log_${userId}`, { 
@@ -90,12 +103,20 @@ const processCampaign = async (userId, camp, client, io, isRunning, supabase) =>
             progress: { current: i + 1, total: contacts.length, sent, invalid, lastIndex: i } 
         });
         
+        if (!isRunning()) break;
+        
         const baseInterval = 49000;
         const randomVariation = Math.random() * 40000 - 20000;
         const finalInterval = Math.max(30000, Math.min(70000, baseInterval + randomVariation));
-        await new Promise(r => setTimeout(r, finalInterval));
+        const stillRunning = await cancellableSleep(finalInterval, isRunning);
+        if (!stillRunning) break;
     }
-    await supabase.from('campaigns').update({ status: 'Completed' }).eq('id', camp.id);
+    
+    if (!isRunning()) {
+        await supabase.from('campaigns').update({ status: 'Stopped' }).eq('id', camp.id);
+    } else {
+        await supabase.from('campaigns').update({ status: 'Completed' }).eq('id', camp.id);
+    }
 };
 
 const syncContacts = async (userId, client, supabase) => {

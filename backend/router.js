@@ -45,6 +45,7 @@ module.exports = (io, supabase, runningCampaigns) => {
   router.post('/stop-campaign', async (req, res) => {
     const { userId } = req.body;
     runningCampaigns.set(userId, false);
+    await supabase.from('campaigns').update({ status: 'Stopped' }).eq('user_id', userId).eq('status', 'Running');
     res.json({ status: 'Stopped' });
   });
 
